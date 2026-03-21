@@ -1,13 +1,16 @@
 import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
+import multer from "multer";
 import {
   getProfile, upsertProfile,
   getExperiences, createExperience, updateExperience, deleteExperience,
   getProjects, createProject, updateProject, deleteProject,
   getEducation, createEducation, updateEducation, deleteEducation,
-  getPoolKeywords, selectPoolItems,
+  getPoolKeywords, selectPoolItems, uploadResume, downloadResume,
 } from "../db-adapter";
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 // ── Skill extraction (mirrors pipeline/src/services/skill-matcher.ts) ─────────
 
@@ -293,6 +296,61 @@ router.post("/select", async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("POST /select error:", err);
     res.status(500).json({ error: err.message || "Failed to select pool items" });
+  }
+});
+
+// ── Storage ───────────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/resume-pool/upload
+ * Upload a PDF to InsForge storage and return the public URL.
+ */
+router.post("/upload", upload.single("file"), async (req: Request, res: Response) => {
+  if (!req.file) {
+    res.status(400).json({ error: "No file uploaded" });
+    return;
+  }
+
+  try {
+    const filename = req.body.filename || req.file.originalname;
+    const url = await uploadResume(filename, req.file.buffer, req.insforgeClient);
+    res.json({ url });
+  } catch (err: any) {
+    console.error("POST /upload error:", err);
+    res.status(500).json({ error: err.message || "Failed to upload file" });
+  }
+});
+
+/**
+ * GET /api/resume-pool/view/:filename
+ * Proxy route to serve stored PDFs with inline disposition so they open in browser tabs.
+ */
+router.get("/view/:filename", async (req: Request, res: Response) => {
+  try {
+    const filename = req.params.filename;
+    const userId = req.userId;
+    if (!userId) throw new Error("Unauthorized");
+
+    const ossHost = process.env.INSFORGE_BASE_URL;
+    if (!ossHost) throw new Error("INSFORGE_BASE_URL not configured");
+
+    // Public URL where the file is hosted
+    const publicUrl = `${ossHost}/api/storage/buckets/resumes/objects/${userId}%2F${encodeURIComponent(filename)}`;
+    
+    // Fetch the file from storage as a buffer
+    const response = await fetch(publicUrl);
+    if (!response.ok) throw new Error(`Storage returned ${response.status}`);
+    
+    const buffer = await response.arrayBuffer();
+
+    // Set headers to FORCE inline viewing
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "inline");
+    
+    res.send(Buffer.from(buffer));
+  } catch (err: any) {
+    console.error("GET /view/:filename error:", err);
+    res.status(404).send("File not found or access denied");
   }
 });
 

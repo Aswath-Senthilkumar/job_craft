@@ -22,10 +22,15 @@ export async function checkDuplicate(jobLink: string, title?: string, companyNam
     if (jobLink) params.set("job_link", jobLink);
     if (title) params.set("job_title", title);
     if (companyName) params.set("company_name", companyName);
+    
     const res = await fetch(
       `${API_URL()}/exists?${params.toString()}`,
-      { signal: withTimeout(FETCH_TIMEOUT_MS), headers: authHeadersNoBody() }
+      { 
+        signal: withTimeout(FETCH_TIMEOUT_MS), 
+        headers: authHeadersNoBody() 
+      }
     );
+    
     if (!res.ok) {
       log.warn(`Duplicate check returned HTTP ${res.status}`);
       return null;
@@ -121,7 +126,10 @@ export async function attachJobAssets(
     try {
       const checkRes = await fetch(
         `${API_URL()}/exists?job_link=${encodeURIComponent(job.link)}`,
-        { signal: withTimeout(FETCH_TIMEOUT_MS), headers: authHeadersNoBody() }
+        { 
+          signal: withTimeout(FETCH_TIMEOUT_MS), 
+          headers: authHeadersNoBody() 
+        }
       );
       if (checkRes.ok) {
         const data = (await checkRes.json()) as any;

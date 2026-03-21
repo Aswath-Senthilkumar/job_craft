@@ -19,15 +19,6 @@ import { extractSkills, computeRelevance } from "./services/skill-matcher";
 import { filterBySeniority } from "./services/seniority-filter";
 import { discoverATSSlugs } from "./services/ats-discovery";
 
-// Local resume storage directory (served by the Express server)
-const RESUMES_DIR = path.join(__dirname, "..", "..", "server", "resumes");
-
-function ensureResumesDir() {
-  if (!fs.existsSync(RESUMES_DIR)) {
-    fs.mkdirSync(RESUMES_DIR, { recursive: true });
-  }
-}
-
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -166,6 +157,32 @@ function assembleResumeFromPool(pool: PoolSelection, ai: EnhancedBulletResult): 
       awards: [],
     },
   };
+}
+
+/**
+ * Upload a generated PDF buffer to the server's InsForge storage.
+ */
+async function uploadResumeToTracker(filename: string, buffer: Buffer): Promise<string> {
+  const formData = new FormData();
+  const blob = new Blob([buffer], { type: "application/pdf" });
+  formData.append("file", blob, filename);
+  formData.append("filename", filename);
+
+  const res = await fetch(`${config.JOB_TRACKER_URL}/api/resume-pool/upload`, {
+    method: "POST",
+    headers: {
+      ...authHeadersNoBody(),
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Upload failed: ${res.status} ${text}`);
+  }
+
+  const data = await res.json() as { url: string };
+  return data.url;
 }
 
 async function main() {
@@ -452,9 +469,9 @@ async function main() {
 
   log.step(`Processing ${processLimit} relevant jobs (tailoring: ${intensityLabel} ${config.TAILORING_INTENSITY}/10)...\n`);
 
-  for (let i = 0; i < relevantQueue.length; i++) {
+  for (let i = 0; i < processLimit; i++) {
     const { job, score, matched, missing, resumeKeywords, jdKeywords } = relevantQueue[i];
-    log.job(i + 1, relevantQueue.length, job.title, job.companyName);
+    log.job(i + 1, processLimit, job.title, job.companyName);
 
     try {
       const matchReason = `Matched ${matched.length} skills: ${matched.slice(0, 5).join(", ")}${matched.length > 5 ? "..." : ""}. Missing: ${missing.slice(0, 3).join(", ")}${missing.length > 3 ? "..." : ""}`;
@@ -544,23 +561,23 @@ async function main() {
         continue;
       }
 
-      // ── Save PDF locally ──
+      // ── Upload PDF to InsForge Storage ──
+      let resumeUrl = "";
       try {
-        ensureResumesDir();
+        const candidateName = resumeData.resumeData?.personalInfo?.name || "CANDIDATE";
+        const rawNameParts = candidateName.toUpperCase().replace(/[^A-Z\s]/g, "").trim().split(/\s+/);
+        const nameParts = rawNameParts.length > 0 ? rawNameParts : ["CANDIDATE"];
+        const roleClean = (job.title.toUpperCase().replace(/[^A-Z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "")) || "ROLE";
+        const companyClean = (job.companyName.toUpperCase().replace(/[^A-Z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "")) || "COMPANY";
+        const pdfFileName = `${nameParts.join("_")}_${roleClean}_${companyClean}_RESUME.pdf`;
+        
+        resumeUrl = await uploadResumeToTracker(pdfFileName, pdfBuffer);
+        log.success(`PDF uploaded to cloud: ${pdfFileName}`);
       } catch (err: any) {
-        log.error(`Cannot create resumes directory: ${err.message}`);
+        log.error(`PDF upload failed: ${err.message}`);
         stats.errors++;
         continue;
       }
-      const candidateName = resumeData.resumeData?.personalInfo?.name || "CANDIDATE";
-      const rawNameParts = candidateName.toUpperCase().replace(/[^A-Z\s]/g, "").trim().split(/\s+/);
-      const nameParts = rawNameParts.length > 0 ? rawNameParts : ["CANDIDATE"];
-      const roleClean = (job.title.toUpperCase().replace(/[^A-Z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "")) || "ROLE";
-      const companyClean = (job.companyName.toUpperCase().replace(/[^A-Z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "")) || "COMPANY";
-      const pdfFileName = `${nameParts.join("_")}_${roleClean}_${companyClean}_RESUME.pdf`;
-      fs.writeFileSync(path.join(RESUMES_DIR, pdfFileName), pdfBuffer);
-      const resumeUrl = `${config.JOB_TRACKER_URL}/resumes/${encodeURIComponent(pdfFileName)}`;
-      log.success(`PDF saved: ${pdfFileName}`);
 
       // ── Attach resume URL to job in tracker ──
       try {

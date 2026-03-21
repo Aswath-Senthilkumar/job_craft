@@ -20,15 +20,16 @@ declare global {
  * - Attaches user + userId + client to req
  */
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
+  let token = "";
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    res.status(401).json({ error: "Missing or invalid Authorization header" });
-    return;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.slice(7);
+  } else if (req.query.token && typeof req.query.token === "string") {
+    token = req.query.token;
   }
 
-  const token = authHeader.slice(7);
   if (!token) {
-    res.status(401).json({ error: "Empty token" });
+    res.status(401).json({ error: "Missing or invalid authentication" });
     return;
   }
 

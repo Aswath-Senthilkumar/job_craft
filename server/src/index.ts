@@ -22,9 +22,6 @@ app.use(cors({
 }));
 app.use(express.json({ limit: "10mb" }));
 
-// Serve resume PDFs from /resumes/<filename>.pdf
-app.use("/resumes", express.static(path.join(__dirname, "..", "resumes")));
-
 // Auth routes — no auth middleware (pre-authentication)
 app.use("/api/auth", authRouter);
 

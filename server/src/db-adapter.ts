@@ -563,6 +563,51 @@ export async function selectPoolItems(jdKeywords: string[], topExperiences = 4, 
   return { profile, experiences: selectedExperiences, projects: selectedProjects, education };
 }
 
+/**
+ * Upload a resume PDF to InsForge Storage.
+ * Path: resumes/{userId}/{filename}
+ */
+export async function uploadResume(filename: string, buffer: Buffer, client?: any): Promise<string> {
+  const c = resolveClient(client);
+  const { data: user } = await c.auth.getCurrentUser();
+  if (!user?.user?.id) throw new Error("User ID not found for upload");
+
+  const path = `${user.user.id}/${filename}`;
+  
+  // Node.js Buffer doesn't have .size which SDK expects (Blob/File)
+  // Converting to Blob ensures .size and .type are available
+  const blob = new Blob([buffer], { type: "application/pdf" });
+  
+  // The SDK upload method only accepts (path, file)
+  const { data, error } = await c.storage.from("resumes").upload(path, blob as any);
+
+  if (error) throw error;
+  if (!data?.url) throw new Error("Upload succeeded but no URL returned");
+
+  return data.url;
+}
+
+/**
+ * Download a resume PDF from InsForge Storage.
+ */
+export async function downloadResume(filename: string, client?: any): Promise<{ buffer: Buffer; contentType: string }> {
+  const c = resolveClient(client);
+  const { data: user } = await c.auth.getCurrentUser();
+  if (!user?.user?.id) throw new Error("User ID not found for download");
+
+  const path = `${user.user.id}/${filename}`;
+  const { data: blob, error } = await c.storage.from("resumes").download(path);
+
+  if (error) throw error;
+  if (!blob) throw new Error("File not found");
+
+  const arrayBuffer = await blob.arrayBuffer();
+  return {
+    buffer: Buffer.from(arrayBuffer),
+    contentType: blob.type || "application/pdf",
+  };
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function parseJson(str: string | null | undefined, fallback: any): any {
