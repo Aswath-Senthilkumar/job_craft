@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs";
-import { config, loadSettings, setUserLocation } from "./config";
+import { config, loadSettings, setUserLocation, authHeaders, authHeadersNoBody } from "./config";
 import { log } from "./logger";
 import { PipelineStats, Job, QueuedJob, ResumeData, EnhancedBulletResult } from "./types";
 import { scrapeJobs } from "./services/apify";
@@ -251,7 +251,7 @@ async function main() {
     }));
     await fetch(`${config.JOB_TRACKER_URL}/api/skills/archive`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify({ jobs: archivePayload }),
     });
     log.success(`Archived ${freshJobs.length} jobs for skills analysis`);
@@ -349,9 +349,9 @@ async function main() {
 
   try {
     const [poolRes, profileRes, educationRes] = await Promise.all([
-      fetch(`${config.JOB_TRACKER_URL}/api/resume-pool/keywords`),
-      fetch(`${config.JOB_TRACKER_URL}/api/resume-pool/profile`),
-      fetch(`${config.JOB_TRACKER_URL}/api/resume-pool/education`),
+      fetch(`${config.JOB_TRACKER_URL}/api/resume-pool/keywords`, { headers: authHeadersNoBody() }),
+      fetch(`${config.JOB_TRACKER_URL}/api/resume-pool/profile`, { headers: authHeadersNoBody() }),
+      fetch(`${config.JOB_TRACKER_URL}/api/resume-pool/education`, { headers: authHeadersNoBody() }),
     ]);
 
     if (poolRes.ok) {
@@ -466,7 +466,7 @@ async function main() {
       try {
         const selectRes = await fetch(`${config.JOB_TRACKER_URL}/api/resume-pool/select`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(),
           body: JSON.stringify({ jdKeywords }),
         });
         if (!selectRes.ok) throw new Error(`Pool select failed: ${selectRes.status}`);
@@ -596,12 +596,12 @@ async function main() {
   // ── Save skills snapshot for today ──
   try {
     const today = new Date().toISOString().split("T")[0];
-    const skillsRes = await fetch(`${config.JOB_TRACKER_URL}/api/skills/current`);
+    const skillsRes = await fetch(`${config.JOB_TRACKER_URL}/api/skills/current`, { headers: authHeadersNoBody() });
     if (skillsRes.ok) {
       const skillsData = (await skillsRes.json()) as any;
       await fetch(`${config.JOB_TRACKER_URL}/api/skills/snapshot`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: JSON.stringify({ date: today, total_jobs: skillsData.total_jobs, skills: skillsData.skills }),
       });
       log.success("Skills snapshot saved");

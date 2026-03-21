@@ -1,19 +1,11 @@
 import { Router, Request, Response } from "express";
-import db from "../db";
+import { getAllSettings, upsertSettings } from "../db-adapter";
 
 const router = Router();
 
-/** Read all pipeline settings from DB as a key-value map */
-function readSettings(): Record<string, string> {
-  const rows = db.prepare("SELECT key, value FROM pipeline_settings").all() as { key: string; value: string }[];
-  const settings: Record<string, string> = {};
-  for (const row of rows) settings[row.key] = row.value;
-  return settings;
-}
-
 // ─── GET /api/settings ───────────────────────────────────────────────
-router.get("/", (_req: Request, res: Response) => {
-  const s = readSettings();
+router.get("/", async (req: Request, res: Response) => {
+  const s = await getAllSettings(req.insforgeClient);
 
   res.json({
     config: {
@@ -50,26 +42,14 @@ router.get("/", (_req: Request, res: Response) => {
 });
 
 // ─── PUT /api/settings ───────────────────────────────────────────────
-router.put("/", (req: Request, res: Response) => {
+router.put("/", async (req: Request, res: Response) => {
   const updates = req.body;
   if (!updates || typeof updates !== "object") {
     res.status(400).json({ error: "Invalid request body" });
     return;
   }
 
-  const upsert = db.prepare(
-    "INSERT INTO pipeline_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
-  );
-
-  let changed = 0;
-  const tx = db.transaction(() => {
-    for (const [key, value] of Object.entries(updates)) {
-      upsert.run(key, String(value));
-      changed++;
-    }
-  });
-  tx();
-
+  const changed = await upsertSettings(updates, req.insforgeClient, req.userId);
   res.json({ ok: true, changed });
 });
 

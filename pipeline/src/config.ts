@@ -22,10 +22,23 @@ const envConfig = {
   APIFY_ACTOR_ID: optional("APIFY_ACTOR_ID", ""),
   JOB_TRACKER_URL: optional("JOB_TRACKER_URL", "http://localhost:3002"),
   PDF_BACKEND_URL: required("PDF_BACKEND_URL"),
+  AUTH_TOKEN: optional("AUTH_TOKEN", ""),
 
   // Scraper-specific env (API keys only)
   CAREERJET_AFFILIATE_ID: optional("CAREERJET_AFFILIATE_ID", ""),
 };
+
+/** Returns auth headers if AUTH_TOKEN is set (for multi-user mode) */
+export function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (config.AUTH_TOKEN) headers["Authorization"] = `Bearer ${config.AUTH_TOKEN}`;
+  return headers;
+}
+
+export function authHeadersNoBody(): Record<string, string> {
+  if (config.AUTH_TOKEN) return { "Authorization": `Bearer ${config.AUTH_TOKEN}` };
+  return {};
+}
 
 // ── User-configurable settings (defaults, overwritten by loadSettings) ──
 const dbSettings = {
@@ -43,7 +56,7 @@ const dbSettings = {
   MAX_REQ_YOE: 0,
   RESUME_ORDER: ["summary", "experience", "skills", "projects", "education"] as string[],
 
-  // Scraper toggles
+  // Scraper toggles (all enabled by default)
   SCRAPE_REMOTEOK: true,
   SCRAPE_JOBICY: true,
   SCRAPE_HN: true,
@@ -51,11 +64,11 @@ const dbSettings = {
   SCRAPE_ARBEITNOW: true,
   SCRAPE_REMOTIVE: true,
   SCRAPE_DEVTO: true,
-  SCRAPE_CAREERJET: false,
-  SCRAPE_GLASSDOOR: false,
+  SCRAPE_CAREERJET: true,
+  SCRAPE_GLASSDOOR: true,
   SCRAPE_INDEED: true,
   SCRAPE_SIMPLIFY: true,
-  SCRAPE_NAUKRI: false,
+  SCRAPE_NAUKRI: true,
   SCRAPE_ASHBY: true,
   SCRAPE_LEVER: true,
   SCRAPE_GREENHOUSE: true,
@@ -74,7 +87,7 @@ export const config = {
 export async function loadSettings(): Promise<void> {
   const url = `${config.JOB_TRACKER_URL}/api/settings`;
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { headers: authHeadersNoBody() });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = (await res.json()) as { config: Record<string, any> };
     const s = data.config;

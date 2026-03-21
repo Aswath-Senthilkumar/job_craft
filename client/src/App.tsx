@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
 import { Job, JobStatus, COLUMNS } from "./types";
 import { fetchJobs, updateJobStatus, batchDeleteJobs, gmailStatus, gmailAuth, gmailSync, gmailDisconnect } from "./api";
+import { useAuth } from "./hooks/useAuth";
+import AuthPage from "./components/AuthPage";
 import KanbanBoard from "./components/KanbanBoard";
 import JobDetailModal from "./components/JobDetailModal";
 import AddJobModal from "./components/AddJobModal";
 import SkillsTrendModal from "./components/SkillsTrendModal";
 import CareerEventsModal from "./components/CareerEventsModal";
 import SettingsModal from "./components/SettingsModal";
+import PipelineModal from "./components/PipelineModal";
 
 interface ConfirmDialog {
   title: string;
@@ -15,6 +18,8 @@ interface ConfirmDialog {
 }
 
 export default function App() {
+  const { user, loading: authLoading, error: authError, needsVerification, login, signup, verifyEmail, resendVerification, logout, clearError } = useAuth();
+
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,6 +35,7 @@ export default function App() {
   const [showSkills, setShowSkills] = useState(false);
   const [showEvents, setShowEvents] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showPipeline, setShowPipeline] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<string>("");
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailSyncing, setGmailSyncing] = useState(false);
@@ -41,19 +47,25 @@ export default function App() {
       setJobs(data);
       setError(null);
     } catch {
-      setError("Failed to load jobs. Is the server running on port 3001?");
+      setError("Failed to load jobs. Is the server running?");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    if (!user) {
+      setJobs([]);
+      setLoading(true);
+      return;
+    }
     loadJobs();
     const interval = setInterval(loadJobs, 30000);
     return () => clearInterval(interval);
-  }, [loadJobs]);
+  }, [loadJobs, user]);
 
   useEffect(() => {
+    if (!user) return;
     gmailStatus().then((s) => { setGmailConnected(s.connected); setGmailLastSync(s.lastSync); }).catch(() => {});
 
     // Handle redirect back from OAuth popup (?gmail=connected)
@@ -71,7 +83,7 @@ export default function App() {
     };
     window.addEventListener("message", messageHandler);
     return () => window.removeEventListener("message", messageHandler);
-  }, []);
+  }, [user]);
 
   // Filter by search query
   const searched = jobs.filter((j) => {
@@ -283,6 +295,21 @@ export default function App() {
   const offerRate = totalApplied > 0 ? Math.round((jobs.filter((j) => j.status === "offer").length / totalApplied) * 100) : 0;
   const rejectionRate = totalApplied > 0 ? Math.round((jobs.filter((j) => j.status === "rejected").length / totalApplied) * 100) : 0;
 
+  // Auth loading screen
+  if (authLoading) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-[#07080a] gap-3">
+        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-gray-500 text-sm">Checking authentication...</p>
+      </div>
+    );
+  }
+
+  // Not authenticated — show login/signup page
+  if (!user) {
+    return <AuthPage onLogin={login} onSignup={signup} onVerify={verifyEmail} onResend={resendVerification} needsVerification={needsVerification} error={authError} clearError={clearError} />;
+  }
+
   if (loading) {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-[#07080a] gap-3">
@@ -480,6 +507,18 @@ export default function App() {
         {/* Divider */}
         <div className="w-px h-5 bg-gray-800 shrink-0" />
 
+        {/* Run Pipeline button */}
+        <button
+          onClick={() => setShowPipeline(true)}
+          className="flex items-center gap-1.5 text-base px-4 py-2.5 rounded-lg border border-cyan-700/50 bg-cyan-600/10 text-cyan-400 hover:bg-cyan-600/20 hover:border-cyan-600/60 transition-all font-medium shrink-0"
+          title="Run job scraping and resume tailoring pipeline"
+        >
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          Pipeline
+        </button>
+
         {/* Settings button */}
         <button
           onClick={() => setShowSettings(true)}
@@ -573,6 +612,23 @@ export default function App() {
             </button>
           </div>
         )}
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* User + Logout */}
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-sm text-gray-500 truncate max-w-[160px]" title={user.email}>
+            {user.profile?.name || user.email}
+          </span>
+          <button
+            onClick={logout}
+            className="text-sm px-3 py-2 rounded-lg border border-gray-800 text-gray-500 hover:border-red-800/50 hover:text-red-400 hover:bg-red-500/5 transition-all"
+            title="Sign out"
+          >
+            Sign Out
+          </button>
+        </div>
       </header>
 
       {error && (
@@ -626,6 +682,9 @@ export default function App() {
 
       {/* Settings Modal */}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+
+      {/* Pipeline Modal */}
+      {showPipeline && <PipelineModal onClose={() => setShowPipeline(false)} />}
     </div>
   );
 }

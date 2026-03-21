@@ -1,13 +1,18 @@
 import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
-import { poolDb as db } from "../db";
+import {
+  getProfile, upsertProfile,
+  getExperiences, createExperience, updateExperience, deleteExperience,
+  getProjects, createProject, updateProject, deleteProject,
+  getEducation, createEducation, updateEducation, deleteEducation,
+  getPoolKeywords, selectPoolItems,
+} from "../db-adapter";
 
 // ── Skill extraction (mirrors pipeline/src/services/skill-matcher.ts) ─────────
 
 interface SkillEntry { canonical: string; aliases: string[] }
 
-// Maps dictionary subcategories → resume skill categories
 const SKILL_CATEGORY_MAP: Record<string, string> = {
   languages: "languages",
   frontend_frameworks: "frameworks", backend_frameworks: "frameworks",
@@ -45,7 +50,6 @@ function loadSkillPhrases() {
       }
     }
   }
-  // Longest first for greedy matching
   skillCategoryLookup = catLookup;
   skillPhrases = phrases.sort((a, b) => b.phrase.length - a.phrase.length);
   return skillPhrases;
@@ -86,166 +90,157 @@ function extractSkillsFromText(text: string): string[] {
 
 const router = Router();
 
-function parseJson(str: string, fallback: any) {
-  try { return JSON.parse(str); } catch { return fallback; }
-}
-
 // ── Profile ───────────────────────────────────────────────────────────────────
 
-router.get("/profile", (_req: Request, res: Response) => {
-  const profile = db.prepare("SELECT * FROM resume_profile WHERE id = 1").get() as any;
-  res.json(profile || { name: "", email: "", phone: "", location: "", linkedin: "", github: "", portfolio: "" });
+router.get("/profile", async (req: Request, res: Response) => {
+  try {
+    res.json(await getProfile(req.insforgeClient));
+  } catch (err: any) {
+    console.error("GET /profile error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch profile" });
+  }
 });
 
-router.put("/profile", (req: Request, res: Response) => {
-  const { name = "", email = "", phone = "", location = "", linkedin = "", github = "", portfolio = "" } = req.body;
-  db.prepare(`
-    INSERT INTO resume_profile (id, name, email, phone, location, linkedin, github, portfolio, updated_at)
-    VALUES (1, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-    ON CONFLICT(id) DO UPDATE SET
-      name = excluded.name, email = excluded.email, phone = excluded.phone,
-      location = excluded.location, linkedin = excluded.linkedin, github = excluded.github,
-      portfolio = excluded.portfolio, updated_at = datetime('now')
-  `).run(name, email, phone, location, linkedin, github, portfolio);
-  res.json({ ok: true });
+router.put("/profile", async (req: Request, res: Response) => {
+  try {
+    await upsertProfile(req.body, req.insforgeClient, req.userId);
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error("PUT /profile error:", err);
+    res.status(500).json({ error: err.message || "Failed to update profile" });
+  }
 });
 
 // ── Experiences ───────────────────────────────────────────────────────────────
 
-router.get("/experiences", (_req: Request, res: Response) => {
-  const rows = db.prepare("SELECT * FROM resume_experiences ORDER BY sort_order ASC, id ASC").all() as any[];
-  res.json(rows.map(r => ({ ...r, skills_used: parseJson(r.skills_used, []) })));
+router.get("/experiences", async (req: Request, res: Response) => {
+  try {
+    res.json(await getExperiences(req.insforgeClient));
+  } catch (err: any) {
+    console.error("GET /experiences error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch experiences" });
+  }
 });
 
-router.post("/experiences", (req: Request, res: Response) => {
-  const { company, title, location = "", start_date = "", end_date = null, summary = "", description = "", skills_used = [], sort_order = 0 } = req.body;
+router.post("/experiences", async (req: Request, res: Response) => {
+  const { company, title } = req.body;
   if (!company || !title) return res.status(400).json({ error: "company and title required" });
-  const result = db.prepare(`
-    INSERT INTO resume_experiences (company, title, location, start_date, end_date, summary, description, skills_used, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(company, title, location, start_date, end_date, summary, description, JSON.stringify(skills_used), sort_order);
-  const row = db.prepare("SELECT * FROM resume_experiences WHERE id = ?").get(result.lastInsertRowid) as any;
-  res.json({ ...row, skills_used: parseJson(row.skills_used, []) });
+  try {
+    res.json(await createExperience(req.body, req.insforgeClient, req.userId));
+  } catch (err: any) {
+    console.error("POST /experiences error:", err);
+    res.status(500).json({ error: err.message || "Failed to create experience" });
+  }
 });
 
-router.put("/experiences/:id", (req: Request, res: Response) => {
-  const { id } = req.params;
-  const existing = db.prepare("SELECT * FROM resume_experiences WHERE id = ?").get(id) as any;
-  if (!existing) return res.status(404).json({ error: "Not found" });
-  const { company, title, location, start_date, end_date, summary, description, skills_used, sort_order } = req.body;
-  db.prepare(`
-    UPDATE resume_experiences SET
-      company = ?, title = ?, location = ?, start_date = ?, end_date = ?,
-      summary = ?, description = ?, skills_used = ?, sort_order = ?, updated_at = datetime('now')
-    WHERE id = ?
-  `).run(
-    company ?? existing.company, title ?? existing.title,
-    location ?? existing.location, start_date ?? existing.start_date,
-    end_date !== undefined ? end_date : existing.end_date,
-    summary ?? existing.summary ?? "",
-    description ?? existing.description,
-    skills_used !== undefined ? JSON.stringify(skills_used) : existing.skills_used,
-    sort_order ?? existing.sort_order, id
-  );
-  const updated = db.prepare("SELECT * FROM resume_experiences WHERE id = ?").get(id) as any;
-  res.json({ ...updated, skills_used: parseJson(updated.skills_used, []) });
+router.put("/experiences/:id", async (req: Request, res: Response) => {
+  try {
+    const result = await updateExperience(req.params.id, req.body, req.insforgeClient);
+    if (!result) return res.status(404).json({ error: "Not found" });
+    res.json(result);
+  } catch (err: any) {
+    console.error("PUT /experiences error:", err);
+    res.status(500).json({ error: err.message || "Failed to update experience" });
+  }
 });
 
-router.delete("/experiences/:id", (req: Request, res: Response) => {
-  db.prepare("DELETE FROM resume_experiences WHERE id = ?").run(req.params.id);
-  res.json({ ok: true });
+router.delete("/experiences/:id", async (req: Request, res: Response) => {
+  try {
+    await deleteExperience(req.params.id, req.insforgeClient);
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error("DELETE /experiences error:", err);
+    res.status(500).json({ error: err.message || "Failed to delete experience" });
+  }
 });
 
 // ── Projects ──────────────────────────────────────────────────────────────────
 
-router.get("/projects", (_req: Request, res: Response) => {
-  const rows = db.prepare("SELECT * FROM resume_projects ORDER BY sort_order ASC, id ASC").all() as any[];
-  res.json(rows.map(r => ({ ...r, tech_stack: parseJson(r.tech_stack, []) })));
+router.get("/projects", async (req: Request, res: Response) => {
+  try {
+    res.json(await getProjects(req.insforgeClient));
+  } catch (err: any) {
+    console.error("GET /projects error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch projects" });
+  }
 });
 
-router.post("/projects", (req: Request, res: Response) => {
-  const { name, summary = "", start_date = "", end_date = null, location = "", description = "", tech_stack = [], url = "", sort_order = 0 } = req.body;
+router.post("/projects", async (req: Request, res: Response) => {
+  const { name } = req.body;
   if (!name) return res.status(400).json({ error: "name required" });
-  const result = db.prepare(`
-    INSERT INTO resume_projects (name, summary, start_date, end_date, location, description, tech_stack, url, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(name, summary, start_date, end_date, location, description, JSON.stringify(tech_stack), url, sort_order);
-  const row = db.prepare("SELECT * FROM resume_projects WHERE id = ?").get(result.lastInsertRowid) as any;
-  res.json({ ...row, tech_stack: parseJson(row.tech_stack, []) });
+  try {
+    res.json(await createProject(req.body, req.insforgeClient, req.userId));
+  } catch (err: any) {
+    console.error("POST /projects error:", err);
+    res.status(500).json({ error: err.message || "Failed to create project" });
+  }
 });
 
-router.put("/projects/:id", (req: Request, res: Response) => {
-  const { id } = req.params;
-  const existing = db.prepare("SELECT * FROM resume_projects WHERE id = ?").get(id) as any;
-  if (!existing) return res.status(404).json({ error: "Not found" });
-  const { name, summary, start_date, end_date, location, description, tech_stack, url, sort_order } = req.body;
-  db.prepare(`
-    UPDATE resume_projects SET
-      name = ?, summary = ?, start_date = ?, end_date = ?, location = ?,
-      description = ?, tech_stack = ?, url = ?, sort_order = ?, updated_at = datetime('now')
-    WHERE id = ?
-  `).run(
-    name ?? existing.name, summary ?? existing.summary ?? "",
-    start_date ?? existing.start_date ?? "",
-    end_date !== undefined ? end_date : existing.end_date,
-    location ?? existing.location ?? "",
-    description ?? existing.description,
-    tech_stack !== undefined ? JSON.stringify(tech_stack) : existing.tech_stack,
-    url ?? existing.url, sort_order ?? existing.sort_order, id
-  );
-  const updated = db.prepare("SELECT * FROM resume_projects WHERE id = ?").get(id) as any;
-  res.json({ ...updated, tech_stack: parseJson(updated.tech_stack, []) });
+router.put("/projects/:id", async (req: Request, res: Response) => {
+  try {
+    const result = await updateProject(req.params.id, req.body, req.insforgeClient);
+    if (!result) return res.status(404).json({ error: "Not found" });
+    res.json(result);
+  } catch (err: any) {
+    console.error("PUT /projects error:", err);
+    res.status(500).json({ error: err.message || "Failed to update project" });
+  }
 });
 
-router.delete("/projects/:id", (req: Request, res: Response) => {
-  db.prepare("DELETE FROM resume_projects WHERE id = ?").run(req.params.id);
-  res.json({ ok: true });
+router.delete("/projects/:id", async (req: Request, res: Response) => {
+  try {
+    await deleteProject(req.params.id, req.insforgeClient);
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error("DELETE /projects error:", err);
+    res.status(500).json({ error: err.message || "Failed to delete project" });
+  }
 });
 
 // ── Education ─────────────────────────────────────────────────────────────────
 
-router.get("/education", (_req: Request, res: Response) => {
-  const rows = db.prepare("SELECT * FROM resume_education ORDER BY sort_order ASC, id ASC").all();
-  res.json(rows);
+router.get("/education", async (req: Request, res: Response) => {
+  try {
+    res.json(await getEducation(req.insforgeClient));
+  } catch (err: any) {
+    console.error("GET /education error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch education" });
+  }
 });
 
-router.post("/education", (req: Request, res: Response) => {
-  const { institution, degree, field = "", start_date = "", end_date = "", grade = "", sort_order = 0 } = req.body;
+router.post("/education", async (req: Request, res: Response) => {
+  const { institution, degree } = req.body;
   if (!institution || !degree) return res.status(400).json({ error: "institution and degree required" });
-  const result = db.prepare(`
-    INSERT INTO resume_education (institution, degree, field, start_date, end_date, grade, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(institution, degree, field, start_date, end_date, grade, sort_order);
-  res.json(db.prepare("SELECT * FROM resume_education WHERE id = ?").get(result.lastInsertRowid));
+  try {
+    res.json(await createEducation(req.body, req.insforgeClient, req.userId));
+  } catch (err: any) {
+    console.error("POST /education error:", err);
+    res.status(500).json({ error: err.message || "Failed to create education" });
+  }
 });
 
-router.put("/education/:id", (req: Request, res: Response) => {
-  const { id } = req.params;
-  const existing = db.prepare("SELECT * FROM resume_education WHERE id = ?").get(id) as any;
-  if (!existing) return res.status(404).json({ error: "Not found" });
-  const { institution, degree, field, start_date, end_date, grade, sort_order } = req.body;
-  db.prepare(`
-    UPDATE resume_education SET
-      institution = ?, degree = ?, field = ?, start_date = ?, end_date = ?,
-      grade = ?, sort_order = ?, updated_at = datetime('now')
-    WHERE id = ?
-  `).run(
-    institution ?? existing.institution, degree ?? existing.degree,
-    field ?? existing.field, start_date ?? existing.start_date,
-    end_date ?? existing.end_date, grade ?? existing.grade,
-    sort_order ?? existing.sort_order, id
-  );
-  res.json(db.prepare("SELECT * FROM resume_education WHERE id = ?").get(id));
+router.put("/education/:id", async (req: Request, res: Response) => {
+  try {
+    const result = await updateEducation(req.params.id, req.body, req.insforgeClient);
+    if (!result) return res.status(404).json({ error: "Not found" });
+    res.json(result);
+  } catch (err: any) {
+    console.error("PUT /education error:", err);
+    res.status(500).json({ error: err.message || "Failed to update education" });
+  }
 });
 
-router.delete("/education/:id", (req: Request, res: Response) => {
-  db.prepare("DELETE FROM resume_education WHERE id = ?").run(req.params.id);
-  res.json({ ok: true });
+router.delete("/education/:id", async (req: Request, res: Response) => {
+  try {
+    await deleteEducation(req.params.id, req.insforgeClient);
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error("DELETE /education error:", err);
+    res.status(500).json({ error: err.message || "Failed to delete education" });
+  }
 });
 
 // ── Extract Skills ────────────────────────────────────────────────────────────
-// Given a description text, returns skills detected via the dictionary.
-// Custom skills (not in dictionary) must be added by the user via TagInput.
 
 router.post("/extract-skills", (req: Request, res: Response) => {
   const { text = "" } = req.body as { text: string };
@@ -254,85 +249,51 @@ router.post("/extract-skills", (req: Request, res: Response) => {
 });
 
 // ── Keywords ──────────────────────────────────────────────────────────────────
-// Returns all unique skills from the pool — used by pipeline Phase 1 relevance scoring
 
-router.get("/keywords", (_req: Request, res: Response) => {
-  const experiences = db.prepare("SELECT skills_used FROM resume_experiences").all() as any[];
-  const projects = db.prepare("SELECT tech_stack FROM resume_projects").all() as any[];
-  const allSkills = new Set<string>();
-  for (const exp of experiences) {
-    parseJson(exp.skills_used, []).forEach((s: string) => s.trim() && allSkills.add(s.trim()));
+router.get("/keywords", async (req: Request, res: Response) => {
+  try {
+    res.json(await getPoolKeywords(req.insforgeClient));
+  } catch (err: any) {
+    console.error("GET /keywords error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch keywords" });
   }
-  for (const proj of projects) {
-    parseJson(proj.tech_stack, []).forEach((s: string) => s.trim() && allSkills.add(s.trim()));
-  }
-  const keywords = Array.from(allSkills);
-  res.json({ keywords, hasPool: experiences.length > 0 || projects.length > 0 });
 });
 
 // ── Select ────────────────────────────────────────────────────────────────────
-// Selects top N experiences and projects by JD keyword overlap (called by pipeline Phase 2)
 
-router.post("/select", (req: Request, res: Response) => {
+router.post("/select", async (req: Request, res: Response) => {
   const { jdKeywords = [], topExperiences = 4, topProjects = 3 } = req.body as {
     jdKeywords: string[];
     topExperiences?: number;
     topProjects?: number;
   };
 
-  const jdSet = new Set(jdKeywords.map((s: string) => s.toLowerCase()));
+  try {
+    const { profile, experiences, projects, education } = await selectPoolItems(jdKeywords, topExperiences, topProjects, req.insforgeClient);
 
-  const experiences = (db.prepare("SELECT * FROM resume_experiences ORDER BY sort_order ASC, id ASC").all() as any[])
-    .map(r => ({ ...r, skills_used: parseJson(r.skills_used, []) as string[] }));
+    const skillsSet = new Set<string>();
+    experiences.forEach((exp: any) => (exp.skills_used || []).forEach((s: string) => skillsSet.add(s)));
+    projects.forEach((proj: any) => (proj.tech_stack || []).forEach((s: string) => skillsSet.add(s)));
 
-  const projects = (db.prepare("SELECT * FROM resume_projects ORDER BY sort_order ASC, id ASC").all() as any[])
-    .map(r => ({ ...r, tech_stack: parseJson(r.tech_stack, []) as string[] }));
-
-  const education = db.prepare("SELECT * FROM resume_education ORDER BY sort_order ASC, id ASC").all();
-  const profile = (db.prepare("SELECT * FROM resume_profile WHERE id = 1").get() as any) || {};
-
-  const scoredExperiences = experiences
-    .map(exp => ({ ...exp, _score: exp.skills_used.filter((s: string) => jdSet.has(s.toLowerCase())).length }))
-    .sort((a, b) => b._score - a._score);
-
-  const scoredProjects = projects
-    .map(proj => ({ ...proj, _score: proj.tech_stack.filter((s: string) => jdSet.has(s.toLowerCase())).length }))
-    .sort((a, b) => b._score - a._score);
-
-  // Select top items by relevance, then re-sort in reverse chronological order (recent first)
-  const parseDate = (d?: string | null) => {
-    if (!d) return 0;
-    const t = new Date(d).getTime();
-    return isNaN(t) ? 0 : t;
-  };
-  const selectedExperiences = scoredExperiences.slice(0, topExperiences)
-    .map(({ _score, ...rest }) => rest)
-    .sort((a, b) => parseDate(b.end_date ?? "9999-12-31") - parseDate(a.end_date ?? "9999-12-31")
-      || parseDate(b.start_date) - parseDate(a.start_date));
-  const selectedProjects = scoredProjects.slice(0, topProjects)
-    .map(({ _score, ...rest }) => rest)
-    .sort((a, b) => parseDate(b.end_date ?? "9999-12-31") - parseDate(a.end_date ?? "9999-12-31")
-      || parseDate(b.start_date) - parseDate(a.start_date));
-
-  const skillsSet = new Set<string>();
-  selectedExperiences.forEach(exp => exp.skills_used.forEach((s: string) => skillsSet.add(s)));
-  selectedProjects.forEach(proj => proj.tech_stack.forEach((s: string) => skillsSet.add(s)));
-
-  res.json({
-    profile: {
-      name: profile.name || "",
-      email: profile.email || "",
-      phone: profile.phone || "",
-      location: profile.location || "",
-      linkedin: profile.linkedin || "",
-      github: profile.github || "",
-      portfolio: profile.portfolio || "",
-    },
-    experiences: selectedExperiences,
-    projects: selectedProjects,
-    education,
-    skills: categorizeSkills(Array.from(skillsSet).filter(Boolean)),
-  });
+    res.json({
+      profile: {
+        name: profile.name || "",
+        email: profile.email || "",
+        phone: profile.phone || "",
+        location: profile.location || "",
+        linkedin: profile.linkedin || "",
+        github: profile.github || "",
+        portfolio: profile.portfolio || "",
+      },
+      experiences,
+      projects,
+      education,
+      skills: categorizeSkills(Array.from(skillsSet).filter(Boolean)),
+    });
+  } catch (err: any) {
+    console.error("POST /select error:", err);
+    res.status(500).json({ error: err.message || "Failed to select pool items" });
+  }
 });
 
 export default router;

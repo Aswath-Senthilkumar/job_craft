@@ -1,4 +1,4 @@
-import { config } from "../config";
+import { config, authHeaders, authHeadersNoBody } from "../config";
 import { Job, DuplicateCheckResult } from "../types";
 import { log } from "../logger";
 
@@ -24,7 +24,7 @@ export async function checkDuplicate(jobLink: string, title?: string, companyNam
     if (companyName) params.set("company_name", companyName);
     const res = await fetch(
       `${API_URL()}/exists?${params.toString()}`,
-      { signal: withTimeout(FETCH_TIMEOUT_MS) }
+      { signal: withTimeout(FETCH_TIMEOUT_MS), headers: authHeadersNoBody() }
     );
     if (!res.ok) {
       log.warn(`Duplicate check returned HTTP ${res.status}`);
@@ -54,7 +54,7 @@ export async function postFilteredJob(
 ): Promise<void> {
   const res = await fetch(API_URL(), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(),
     signal: withTimeout(FETCH_TIMEOUT_MS),
     body: JSON.stringify({
       job_title: job.title,
@@ -121,7 +121,7 @@ export async function attachJobAssets(
     try {
       const checkRes = await fetch(
         `${API_URL()}/exists?job_link=${encodeURIComponent(job.link)}`,
-        { signal: withTimeout(FETCH_TIMEOUT_MS) }
+        { signal: withTimeout(FETCH_TIMEOUT_MS), headers: authHeadersNoBody() }
       );
       if (checkRes.ok) {
         const data = (await checkRes.json()) as any;
@@ -129,7 +129,7 @@ export async function attachJobAssets(
           // PATCH the existing job with resume + email
           const patchRes = await fetch(`${API_URL()}/${data.id}`, {
             method: "PATCH",
-            headers: { "Content-Type": "application/json" },
+            headers: authHeaders(),
             signal: withTimeout(FETCH_TIMEOUT_MS),
             body: JSON.stringify({
               resume_url: resumeUrl,
@@ -156,7 +156,7 @@ export async function attachJobAssets(
   // Fallback: POST (upsert)
   const res = await fetch(API_URL(), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(),
     signal: withTimeout(FETCH_TIMEOUT_MS),
     body: JSON.stringify({
       job_title: job.title,
