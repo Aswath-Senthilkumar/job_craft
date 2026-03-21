@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+
+# Environment files (contain API keys, secrets)
+.env
+.env.*
+!.env.example
+
+
+# Google service account credentials
+google-service-account.json
+
+# OAuth tokens (contain secrets — regenerated via OAuth flow)
+gmail-token.json
+
+# SQLite databases
+*.db
+*.db-wal
+*.db-shm
+
+# Generated resume PDFs
+server/resumes/
+
+# Uploaded resume data
+server/data/
+
+# Build output
+dist/
+build/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code local settings
+.claude/
+
+# Logs
+*.log
+npm-debug.log*
+
+# unwanted markdown
+resume_prompt_iteration.md
+FUTURE_ENHANCEMENTS.md
+
+# Sample data
+sample-resume-data.json
