@@ -1,91 +1,39 @@
 import { Router, Request, Response } from "express";
-import db from "../db";
+import { getEvents, batchUpsertEvents, deleteEvent } from "../db-adapter";
 
 const router = Router();
 
 // GET /api/events — list career events with optional filters
-// Query params: upcoming=true, location=dublin, type=career_fair
-router.get("/", (req: Request, res: Response) => {
+router.get("/", async (req: Request, res: Response) => {
   const { upcoming, location, type } = req.query;
-
-  let query = "SELECT * FROM career_events WHERE 1=1";
-  const params: string[] = [];
-
-  if (upcoming === "true") {
-    const today = new Date().toISOString().split("T")[0];
-    query += " AND (event_date >= ? OR event_date IS NULL OR event_date = '')";
-    params.push(today);
-  }
-
-  if (location && typeof location === "string") {
-    query += " AND LOWER(location) LIKE ?";
-    params.push(`%${location.toLowerCase()}%`);
-  }
-
-  if (type && typeof type === "string") {
-    query += " AND event_type = ?";
-    params.push(type);
-  }
-
-  query += " ORDER BY CASE WHEN event_date IS NULL OR event_date = '' THEN 1 ELSE 0 END, event_date ASC LIMIT 100";
-
-  const events = db.prepare(query).all(...params);
+  const events = await getEvents({
+    upcoming: upcoming === "true",
+    location: location && typeof location === "string" ? location : undefined,
+    type: type && typeof type === "string" ? type : undefined,
+  }, req.insforgeClient);
   res.json(events);
 });
 
 // POST /api/events/batch — upsert multiple career events (called by pipeline)
-router.post("/batch", (req: Request, res: Response) => {
+router.post("/batch", async (req: Request, res: Response) => {
   const { events } = req.body;
   if (!Array.isArray(events)) {
     res.status(400).json({ error: "events must be an array" });
     return;
   }
 
-  let inserted = 0;
-  for (const ev of events) {
-    const eventUrl = ev.event_url || ev.url;
-    if (!ev.title || !eventUrl) continue;
-    const existing = db.prepare("SELECT id FROM career_events WHERE event_url = ?").get(eventUrl);
-    if (!existing) {
-      db.prepare(
-        `INSERT INTO career_events (title, organizer, location, event_date, event_url, description, event_type, source)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(
-        ev.title, ev.organizer || null, ev.location || null,
-        ev.eventDate || ev.event_date || null, eventUrl,
-        ev.description || null, ev.eventType || ev.event_type || "career_fair",
-        ev.source || null
-      );
-      inserted++;
-    }
-  }
-
+  const inserted = await batchUpsertEvents(events, req.insforgeClient);
   res.json({ inserted, total: events.length });
 });
 
 // GET /api/events/export.ics — export events as iCalendar file
-router.get("/export.ics", (req: Request, res: Response) => {
+router.get("/export.ics", async (req: Request, res: Response) => {
   const { upcoming, location, type } = req.query;
-
-  let query = "SELECT * FROM career_events WHERE 1=1";
-  const params: string[] = [];
-
-  if (upcoming === "true") {
-    const today = new Date().toISOString().split("T")[0];
-    query += " AND (event_date >= ? OR event_date IS NULL OR event_date = '')";
-    params.push(today);
-  }
-  if (location && typeof location === "string") {
-    query += " AND LOWER(location) LIKE ?";
-    params.push(`%${location.toLowerCase()}%`);
-  }
-  if (type && typeof type === "string") {
-    query += " AND event_type = ?";
-    params.push(type);
-  }
-  query += " ORDER BY event_date ASC LIMIT 200";
-
-  const events = db.prepare(query).all(...params) as any[];
+  const events = await getEvents({
+    upcoming: upcoming === "true",
+    location: location && typeof location === "string" ? location : undefined,
+    type: type && typeof type === "string" ? type : undefined,
+  }, req.insforgeClient);
 
   // Build iCalendar
   const lines: string[] = [
@@ -97,9 +45,9 @@ router.get("/export.ics", (req: Request, res: Response) => {
     "X-WR-CALNAME:Career Events",
   ];
 
-  for (const ev of events) {
+  for (const ev of events as any[]) {
     const dtStart = formatIcsDate(ev.event_date);
-    const dtEnd = formatIcsDate(ev.event_date, 2); // assume 2 hours
+    const dtEnd = formatIcsDate(ev.event_date, 2);
     const uid = `event-${ev.id}@jobtracker`;
     const now = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
 
@@ -138,9 +86,9 @@ function icsEscape(text: string): string {
 }
 
 // DELETE /api/events/:id
-router.delete("/:id", (req: Request, res: Response) => {
-  const result = db.prepare("DELETE FROM career_events WHERE id = ?").run(req.params.id);
-  if (result.changes === 0) {
+router.delete("/:id", async (req: Request, res: Response) => {
+  const success = await deleteEvent(req.params.id, req.insforgeClient);
+  if (!success) {
     res.status(404).json({ error: "Event not found" });
     return;
   }

@@ -1,5 +1,6 @@
 import { Draggable } from "@hello-pangea/dnd";
 import { Job, Column } from "../types";
+import { getAuthToken } from "../api";
 
 const SOURCE_COLORS: Record<string, string> = {
   linkedin: "text-blue-400 bg-blue-500/10 border-blue-500/20",
@@ -125,6 +126,14 @@ export default function JobCard({ job, index, column, onClick, selectionMode, is
 
   const isReach = job.notes?.toLowerCase().includes("reach role");
   const deadline = formatDeadline(job.deadline);
+
+  const getResumeViewUrl = (url: string) => {
+    // Cloud storage URLs may use encoded slashes (%2F)
+    const decodedUrl = decodeURIComponent(url);
+    const filename = decodedUrl.split("/").pop();
+    const token = getAuthToken();
+    return `/api/resume-pool/view/${filename}?token=${token}`;
+  };
 
   function handleClick(e: React.MouseEvent) {
     if (selectionMode) {
@@ -310,7 +319,7 @@ export default function JobCard({ job, index, column, onClick, selectionMode, is
               )}
               {job.resume_url && !selectionMode && (
                 <a
-                  href={job.resume_url}
+                  href={getResumeViewUrl(job.resume_url)}
                   target="_blank"
                   rel="noreferrer"
                   onClick={(e) => e.stopPropagation()}

@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { google } from "googleapis";
 import path from "path";
 import fs from "fs";
-import db from "../db";
+import { getAllJobs, updateJob, upsertJob } from "../db-adapter";
 
 const router = Router();
 const TOKEN_PATH = path.join(process.cwd(), "gmail-token.json");
@@ -273,7 +273,7 @@ function classifyEmail(subject: string, snippet: string, body: string): EmailInf
 }
 
 // ── POST /api/gmail/sync ─────────────────────────────────────────────────────
-router.post("/sync", async (_req: Request, res: Response) => {
+router.post("/sync", async (req: Request, res: Response) => {
   if (!fs.existsSync(TOKEN_PATH)) {
     res.status(401).json({ error: "Gmail not connected. Visit /api/gmail/auth first." });
     return;
@@ -328,9 +328,7 @@ router.post("/sync", async (_req: Request, res: Response) => {
     const updates: Array<{ id: number | null; company: string; newStatus: string; label: string; subject: string; created?: boolean }> = [];
 
     // Load all jobs (including already-applied / rejected — to avoid re-creating)
-    const allJobs = db.prepare("SELECT id, company_name, job_link, status FROM jobs").all() as Array<{
-      id: number; company_name: string; job_link: string | null; status: string;
-    }>;
+    const allJobs = await getAllJobs(undefined, req.insforgeClient);
 
     const rank: Record<string, number> = { filtered: 0, saved: 0, applied: 1, interviewing: 2, offer: 3, rejected: 4 };
 
@@ -359,7 +357,7 @@ router.post("/sync", async (_req: Request, res: Response) => {
         const fromPlatform = isFromPlatform(from);
 
         // ── Match against existing jobs ──────────────────────────────────────
-        let matchedJob: typeof allJobs[0] | null = null;
+        let matchedJob: any | null = null;
 
         for (const job of allJobs) {
           let matched = false;
@@ -384,16 +382,12 @@ router.post("/sync", async (_req: Request, res: Response) => {
 
         if (matchedJob) {
           // Update existing job
-          const dateField = info.status === "interviewing" ? "interview_date"
-                          : info.status === "offer"        ? "offer_date"
-                          : null;
-          if (dateField) {
-            db.prepare(`UPDATE jobs SET status = ?, ${dateField} = COALESCE(${dateField}, ?), updated_at = datetime('now') WHERE id = ?`)
-              .run(info.status, info.date, matchedJob.id);
-          } else {
-            db.prepare("UPDATE jobs SET status = ?, updated_at = datetime('now') WHERE id = ?")
-              .run(info.status, matchedJob.id);
-          }
+          const fields: any = { status: info.status };
+          if (info.status === "interviewing") fields.interview_date = info.date;
+          if (info.status === "offer")        fields.offer_date = info.date;
+
+          await updateJob(matchedJob.id, fields, req.insforgeClient);
+          
           matchedJob.status = info.status; // prevent double-update in same sync
           updates.push({ id: matchedJob.id, company: matchedJob.company_name, newStatus: info.status, label: info.label, subject });
 
@@ -417,21 +411,20 @@ router.post("/sync", async (_req: Request, res: Response) => {
             } catch { /* invalid date header — use default */ }
           }
 
-          const result = db.prepare(
-            `INSERT INTO jobs (job_title, company_name, location, status, applied_date, notes, created_at, updated_at)
-             VALUES (?, ?, ?, 'applied', ?, ?, datetime('now'), datetime('now'))`
-          ).run(
-            jobTitle,
-            info.company,
+          const { job: newJob } = await upsertJob({
+            job_title: jobTitle,
+            company_name: info.company,
             location,
-            appliedDate,
-            "Auto-added by Gmail sync (LinkedIn Easy Apply)"
-          );
+            status: "applied",
+            applied_date: appliedDate,
+            notes: "Auto-added by Gmail sync (LinkedIn Easy Apply)"
+          }, req.insforgeClient, req.userId);
 
-          const newId = result.lastInsertRowid as number;
-          // Add to in-memory list to prevent duplicates within same sync
-          allJobs.push({ id: newId, company_name: info.company, job_link: null, status: "applied" });
-          updates.push({ id: newId, company: info.company, newStatus: "applied", label: "New job auto-created", subject, created: true });
+          if (newJob) {
+            // Add to in-memory list to prevent duplicates within same sync
+            allJobs.push(newJob);
+            updates.push({ id: newJob.id, company: info.company, newStatus: "applied", label: "New job auto-created", subject, created: true });
+          }
         }
       } catch (msgErr: any) {
         console.error(`[Gmail sync] Error processing message ${msg.id}: ${msgErr.message}`);
