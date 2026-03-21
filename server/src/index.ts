@@ -30,8 +30,11 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", backend: "insforge" });
 });
 
-// Auth middleware — all routes below require authentication
-app.use(authMiddleware);
+// Auth middleware — skip Gmail callback (Google redirect has no Bearer token; auth recovered from state param)
+app.use((req, res, next) => {
+  if (req.path === "/api/gmail/callback") return next();
+  return authMiddleware(req, res, next);
+});
 
 app.use("/api/jobs", jobsRouter);
 app.use("/api/gmail", gmailRouter);
