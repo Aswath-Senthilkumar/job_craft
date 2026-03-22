@@ -89,7 +89,8 @@ router.post("/run", async (req: Request, res: Response) => {
   }
 
   // Spawn pipeline with fresh token + pipeline's env vars
-  const child = spawn("npx tsx src/index.ts", [], {
+  const tsxBin = path.join(pipelineDir, "node_modules", ".bin", "tsx");
+  const child = spawn(tsxBin, ["src/index.ts"], {
     cwd: pipelineDir,
     env: {
       ...process.env,
@@ -97,7 +98,7 @@ router.post("/run", async (req: Request, res: Response) => {
       AUTH_TOKEN: freshToken,
       JOB_TRACKER_URL: `http://localhost:${process.env.PORT || 3002}`,
     },
-    shell: true,
+    shell: false,
     stdio: ["ignore", "pipe", "pipe"],
   });
 
