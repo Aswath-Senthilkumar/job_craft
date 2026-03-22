@@ -68,6 +68,34 @@ Search for local career fairs, tech meetups, and networking events relevant to t
 EVENTBRITE_API_KEY=   # Eventbrite private token
 ```
 
+## Resume Manual Editor with Diff Tracking
+
+**Problem:** The AI-tailored resume is generated and uploaded as a PDF, but users have no way to review the generated content, make manual edits, restructure bullet points, or adjust layout/alignment before the final PDF is produced.
+
+**Proposed solution:** After the pipeline generates a tailored resume, surface an in-dashboard editor that shows the AI output with diff highlighting (original pool content vs. AI-enhanced version). Users can accept/reject individual changes, manually rewrite any section, reorder bullet points via drag-and-drop, and trigger a PDF regeneration from the edited content.
+
+**Flow:**
+1. User clicks a job card's resume badge → opens the Resume Editor modal
+2. UI loads the stored `resume_data` JSON (original pool bullets + AI-enhanced bullets side by side)
+3. Diff view highlights additions, removals, and rewrites per bullet with accept/reject toggles
+4. Free-text editing allowed on any field — summary, bullets, skills, section order
+5. Drag-and-drop reordering of bullet points within each experience/project block
+6. "Regenerate PDF" button calls the PDF backend with the edited `resume_data` and replaces the stored PDF
+
+**What needs to be built:**
+- Resume editor modal (`client/src/components/ResumeEditorModal.tsx`) — diff view, inline editing, drag-and-drop bullets
+- `POST /api/jobs/:id/save-resume` — persist manually edited `resume_data` back to the DB
+- `POST /api/jobs/:id/regenerate-pdf` — call `PDF_BACKEND_URL` with edited data, upload new PDF, update `resume_url`
+- Diff computation utility — compare original pool bullets vs. AI output at the sentence level
+- Layout alignment controls — section spacing, bullet indent, font size hints passed to the PDF renderer
+
+**Why deferred:**
+- Requires a rich text / structured editor component with diff rendering — non-trivial UI work
+- PDF renderer would need to accept fine-grained layout hints beyond the current resume JSON schema
+- The `resume_data` column and pipeline attachment are already in place, so the data layer is ready
+
+---
+
 ## Pipeline Job Queue Cache
 
 **Problem:** Every pipeline run re-scrapes all sources from scratch. After skill scoring, a ranked `relevantQueue` is built — but only up to `MAX_JOBS_TEST_LIMIT` jobs get AI-tailored and posted. The remaining scored-but-unprocessed jobs are discarded, so the next run re-discovers and re-scores them unnecessarily.
