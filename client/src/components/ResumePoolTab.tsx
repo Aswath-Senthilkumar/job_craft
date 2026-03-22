@@ -17,8 +17,8 @@ interface Props {
   onError: (msg: string) => void;
 }
 
-const inputCls = "w-full bg-[#0a0c10] border border-gray-800/60 rounded-lg px-3 py-2 text-xs text-gray-200 placeholder:text-gray-700 focus:outline-none focus:border-blue-500/40";
-const labelCls = "text-[11px] text-gray-400 font-medium block mb-1";
+const inputCls = "w-full bg-[#0c0f14] border border-gray-700/50 rounded-lg px-3 py-2 text-xs text-gray-200 placeholder:text-gray-600 focus:outline-none focus:border-blue-500/50 transition-colors";
+const labelCls = "text-xs text-gray-300 font-medium block mb-1";
 
 function TagInput({ value, onChange, placeholder }: { value: string[]; onChange: (v: string[]) => void; placeholder?: string }) {
   const [input, setInput] = useState("");
@@ -31,7 +31,7 @@ function TagInput({ value, onChange, placeholder }: { value: string[]; onChange:
     <div>
       <div className="flex flex-wrap gap-1 mb-1.5 min-h-[20px]">
         {value.map((tag) => (
-          <span key={tag} className="flex items-center gap-1 text-[11px] bg-blue-500/10 border border-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">
+          <span key={tag} className="flex items-center gap-1 text-xs bg-blue-500/10 border border-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">
             {tag}
             <button type="button" onClick={() => onChange(value.filter(t => t !== tag))} className="text-blue-400/60 hover:text-blue-300 leading-none">&times;</button>
           </span>
@@ -78,7 +78,7 @@ function ProfileSection({ onFlash, onError }: Props) {
           <div key={k}><label className={labelCls}>{k.charAt(0).toUpperCase() + k.slice(1)} URL</label><input value={profile[k]} onChange={e => set(k, e.target.value)} className={inputCls} placeholder="https://..." /></div>
         ))}
       </div>
-      <button onClick={save} disabled={saving} className="w-full text-xs font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 py-2 rounded-lg transition-all disabled:opacity-50">{saving ? "Saving..." : "Save Profile"}</button>
+      <button onClick={save} disabled={saving} className="w-full text-xs font-medium text-gray-200 bg-gray-700/40 hover:bg-gray-700/60 border border-gray-600/50 py-2 rounded-lg transition-all disabled:opacity-50">{saving ? "Saving..." : "Save Profile"}</button>
     </div>
   );
 }
@@ -114,20 +114,20 @@ function ExperienceSection({ onFlash, onError }: Props) {
   return (
     <div className="space-y-2">
       {items.map(item => (
-        <div key={item.id} className="p-3 rounded-xl border border-gray-800/60 bg-[#0f1115]">
+        <div key={item.id} className="p-3 rounded-xl border border-gray-700/40 bg-[#0e1014]">
           {editId === item.id ? (
             <ExpFormUI form={form} setF={setF} isCurrent={isCurrent} setIsCurrent={setIsCurrent} saving={saving} onSave={save} onCancel={() => setEditId(null)} />
           ) : (
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-gray-200">{item.title} <span className="text-gray-500 font-normal">@ {item.company}</span></p>
-                <p className="text-[11px] text-gray-500">{item.start_date} - {item.end_date || "Present"}{item.location ? ` · ${item.location}` : ""}</p>
-                {item.summary && <p className="text-[11px] text-gray-400 italic mt-0.5">{item.summary}</p>}
-                {item.skills_used.length > 0 && <div className="flex flex-wrap gap-1 mt-1.5">{item.skills_used.slice(0, 6).map(s => <span key={s} className="text-[10px] text-blue-300 bg-blue-500/10 border border-blue-500/15 px-1.5 py-0.5 rounded">{s}</span>)}{item.skills_used.length > 6 && <span className="text-[10px] text-gray-600">+{item.skills_used.length - 6}</span>}</div>}
+                <p className="text-xs text-gray-500">{item.start_date} - {item.end_date || "Present"}{item.location ? ` · ${item.location}` : ""}</p>
+                {item.summary && <p className="text-xs text-gray-400 italic mt-0.5">{item.summary}</p>}
+                {item.skills_used.length > 0 && <div className="flex flex-wrap gap-1 mt-1.5">{item.skills_used.slice(0, 6).map(s => <span key={s} className="text-xs text-blue-300/80 bg-blue-500/10 border border-blue-500/15 px-1.5 py-0.5 rounded">{s}</span>)}{item.skills_used.length > 6 && <span className="text-xs text-gray-500">+{item.skills_used.length - 6}</span>}</div>}
               </div>
               <div className="flex gap-1 shrink-0">
-                <button onClick={() => openEdit(item)} className="text-[11px] text-gray-500 hover:text-gray-300 px-2 py-1 rounded-lg hover:bg-gray-800/60">Edit</button>
-                <button onClick={() => del(item.id)} className="text-[11px] text-red-500/60 hover:text-red-400 px-2 py-1 rounded-lg hover:bg-red-500/10">Del</button>
+                <button onClick={() => openEdit(item)} className="text-xs text-gray-400 hover:text-gray-200 px-2 py-1 rounded-lg hover:bg-gray-700/50 transition-colors">Edit</button>
+                <button onClick={() => del(item.id)} className="text-xs text-gray-500 hover:text-red-400 px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors">Del</button>
               </div>
             </div>
           )}
@@ -162,7 +162,7 @@ function ExpFormUI({ form, setF, isCurrent, setIsCurrent, saving, onSave, onCanc
       <div className="flex items-center gap-3">
         <label className="flex items-center gap-2 cursor-pointer" onClick={() => setIsCurrent(!isCurrent)}>
           <div className={`w-8 h-4 rounded-full transition-colors relative ${isCurrent ? "bg-emerald-500/30" : "bg-gray-800"}`}><div className={`absolute top-0.5 w-3 h-3 rounded-full transition-all ${isCurrent ? "left-4 bg-emerald-400" : "left-0.5 bg-gray-600"}`} /></div>
-          <span className="text-[11px] text-gray-400">Currently working here</span>
+          <span className="text-xs text-gray-400">Currently working here</span>
         </label>
         {!isCurrent && <div className="flex-1"><label className={labelCls}>End Date</label><input value={form.end_date || ""} onChange={e => setF("end_date", e.target.value || null)} className={inputCls} placeholder="Dec 2023" /></div>}
       </div>
@@ -170,14 +170,14 @@ function ExpFormUI({ form, setF, isCurrent, setIsCurrent, saving, onSave, onCanc
       <div>
         <div className="flex items-center justify-between mb-1">
           <label className={labelCls + " mb-0"}>Description (one bullet per line)</label>
-          <button type="button" onClick={autoDetect} disabled={detecting || !form.description.trim()} className="text-[10px] text-blue-400/70 hover:text-blue-300 disabled:opacity-30 transition-colors">{detecting ? "Detecting..." : "Auto-detect skills"}</button>
+          <button type="button" onClick={autoDetect} disabled={detecting || !form.description.trim()} className="text-xs text-gray-500 hover:text-blue-300 disabled:opacity-30 transition-colors">{detecting ? "Detecting..." : "Auto-detect skills"}</button>
         </div>
         <textarea value={form.description} onChange={e => setF("description", e.target.value)} rows={4} className={inputCls + " resize-none font-mono"} placeholder={"- Built REST APIs with Node.js\n- Led AWS migration, reduced costs 30%"} />
       </div>
       <div><label className={labelCls}>Skills Used</label><TagInput value={form.skills_used} onChange={v => setF("skills_used", v)} placeholder="Type custom skill and press Enter..." /></div>
       <div className="flex gap-2 pt-1">
-        <button onClick={onSave} disabled={saving || !form.title || !form.company} className="flex-1 text-xs font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 py-2 rounded-lg disabled:opacity-50">{saving ? "Saving..." : "Save"}</button>
-        <button onClick={onCancel} className="text-xs text-gray-500 hover:text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-800/60">Cancel</button>
+        <button onClick={onSave} disabled={saving || !form.title || !form.company} className="flex-1 text-xs font-medium text-gray-200 bg-gray-700/40 hover:bg-gray-700/60 border border-gray-600/50 py-2 rounded-lg disabled:opacity-50 transition-colors">{saving ? "Saving..." : "Save"}</button>
+        <button onClick={onCancel} className="text-xs text-gray-400 hover:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-700/40 transition-colors">Cancel</button>
       </div>
     </div>
   );
@@ -213,21 +213,21 @@ function ProjectsSection({ onFlash, onError }: Props) {
   return (
     <div className="space-y-2">
       {items.map(item => (
-        <div key={item.id} className="p-3 rounded-xl border border-gray-800/60 bg-[#0f1115]">
+        <div key={item.id} className="p-3 rounded-xl border border-gray-700/40 bg-[#0e1014]">
           {editId === item.id ? (
             <ProjFormUI form={form} setF={setF} saving={saving} onSave={save} onCancel={() => setEditId(null)} />
           ) : (
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-gray-200">{item.name}</p>
-                {(item.start_date || item.location) && <p className="text-[11px] text-gray-500">{item.start_date}{item.end_date ? ` - ${item.end_date}` : item.start_date ? " - Present" : ""}{item.location ? `${item.start_date ? " · " : ""}${item.location}` : ""}</p>}
-                {item.summary && <p className="text-[11px] text-gray-400 italic">{item.summary}</p>}
-                {item.url && <p className="text-[11px] text-blue-400/70 truncate">{item.url}</p>}
-                {item.tech_stack.length > 0 && <div className="flex flex-wrap gap-1 mt-1.5">{item.tech_stack.slice(0, 6).map(s => <span key={s} className="text-[10px] text-violet-300 bg-violet-500/10 border border-violet-500/15 px-1.5 py-0.5 rounded">{s}</span>)}{item.tech_stack.length > 6 && <span className="text-[10px] text-gray-600">+{item.tech_stack.length - 6}</span>}</div>}
+                {(item.start_date || item.location) && <p className="text-xs text-gray-500">{item.start_date}{item.end_date ? ` - ${item.end_date}` : item.start_date ? " - Present" : ""}{item.location ? `${item.start_date ? " · " : ""}${item.location}` : ""}</p>}
+                {item.summary && <p className="text-xs text-gray-400 italic">{item.summary}</p>}
+                {item.url && <p className="text-xs text-blue-400/70 truncate">{item.url}</p>}
+                {item.tech_stack.length > 0 && <div className="flex flex-wrap gap-1 mt-1.5">{item.tech_stack.slice(0, 6).map(s => <span key={s} className="text-xs text-violet-300/80 bg-violet-500/10 border border-violet-500/15 px-1.5 py-0.5 rounded">{s}</span>)}{item.tech_stack.length > 6 && <span className="text-xs text-gray-500">+{item.tech_stack.length - 6}</span>}</div>}
               </div>
               <div className="flex gap-1 shrink-0">
-                <button onClick={() => openEdit(item)} className="text-[11px] text-gray-500 hover:text-gray-300 px-2 py-1 rounded-lg hover:bg-gray-800/60">Edit</button>
-                <button onClick={() => del(item.id)} className="text-[11px] text-red-500/60 hover:text-red-400 px-2 py-1 rounded-lg hover:bg-red-500/10">Del</button>
+                <button onClick={() => openEdit(item)} className="text-xs text-gray-400 hover:text-gray-200 px-2 py-1 rounded-lg hover:bg-gray-700/50 transition-colors">Edit</button>
+                <button onClick={() => del(item.id)} className="text-xs text-gray-500 hover:text-red-400 px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors">Del</button>
               </div>
             </div>
           )}
@@ -262,21 +262,21 @@ function ProjFormUI({ form, setF, saving, onSave, onCancel }: { form: ProjForm; 
       </div>
       <label className="flex items-center gap-2 cursor-pointer" onClick={() => { setIsCurrent(!isCurrent); if (!isCurrent) setF("end_date", null); }}>
         <div className={`w-8 h-4 rounded-full transition-colors relative ${isCurrent ? "bg-emerald-500/30" : "bg-gray-800"}`}><div className={`absolute top-0.5 w-3 h-3 rounded-full transition-all ${isCurrent ? "left-4 bg-emerald-400" : "left-0.5 bg-gray-600"}`} /></div>
-        <span className="text-[11px] text-gray-400">Currently active</span>
+        <span className="text-xs text-gray-400">Currently active</span>
       </label>
       <div><label className={labelCls}>Summary (short tagline for resume)</label><input value={form.summary} onChange={e => setF("summary", e.target.value)} className={inputCls} placeholder="Cloud-based resume optimization system." /></div>
       <div><label className={labelCls}>URL</label><input value={form.url} onChange={e => setF("url", e.target.value)} className={inputCls} placeholder="https://github.com/..." /></div>
       <div>
         <div className="flex items-center justify-between mb-1">
           <label className={labelCls + " mb-0"}>Description (one bullet per line)</label>
-          <button type="button" onClick={autoDetect} disabled={detecting || !form.description.trim()} className="text-[10px] text-violet-400/70 hover:text-violet-300 disabled:opacity-30 transition-colors">{detecting ? "Detecting..." : "Auto-detect tech"}</button>
+          <button type="button" onClick={autoDetect} disabled={detecting || !form.description.trim()} className="text-xs text-gray-500 hover:text-violet-300 disabled:opacity-30 transition-colors">{detecting ? "Detecting..." : "Auto-detect tech"}</button>
         </div>
         <textarea value={form.description} onChange={e => setF("description", e.target.value)} rows={3} className={inputCls + " resize-none font-mono"} placeholder={"- Scrapes 500+ jobs daily\n- Reduced search time by 80%"} />
       </div>
       <div><label className={labelCls}>Tech Stack</label><TagInput value={form.tech_stack} onChange={v => setF("tech_stack", v)} placeholder="Type custom tech and press Enter..." /></div>
       <div className="flex gap-2 pt-1">
-        <button onClick={onSave} disabled={saving || !form.name} className="flex-1 text-xs font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 py-2 rounded-lg disabled:opacity-50">{saving ? "Saving..." : "Save"}</button>
-        <button onClick={onCancel} className="text-xs text-gray-500 hover:text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-800/60">Cancel</button>
+        <button onClick={onSave} disabled={saving || !form.name} className="flex-1 text-xs font-medium text-gray-200 bg-gray-700/40 hover:bg-gray-700/60 border border-gray-600/50 py-2 rounded-lg disabled:opacity-50 transition-colors">{saving ? "Saving..." : "Save"}</button>
+        <button onClick={onCancel} className="text-xs text-gray-400 hover:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-700/40 transition-colors">Cancel</button>
       </div>
     </div>
   );
@@ -309,18 +309,18 @@ function EducationSection({ onFlash, onError }: Props) {
   return (
     <div className="space-y-2">
       {items.map(item => (
-        <div key={item.id} className="p-3 rounded-xl border border-gray-800/60 bg-[#0f1115]">
+        <div key={item.id} className="p-3 rounded-xl border border-gray-700/40 bg-[#0e1014]">
           {editId === item.id ? (
             <EduFormUI form={form} setF={setF} saving={saving} onSave={save} onCancel={() => setEditId(null)} />
           ) : (
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="text-xs font-semibold text-gray-200">{item.degree}{item.field ? ` in ${item.field}` : ""}</p>
-                <p className="text-[11px] text-gray-500">{item.institution}{item.start_date ? ` · ${item.start_date} - ${item.end_date || "Present"}` : ""}{item.grade ? ` · ${item.grade}` : ""}</p>
+                <p className="text-xs text-gray-500">{item.institution}{item.start_date ? ` · ${item.start_date} - ${item.end_date || "Present"}` : ""}{item.grade ? ` · ${item.grade}` : ""}</p>
               </div>
               <div className="flex gap-1 shrink-0">
-                <button onClick={() => openEdit(item)} className="text-[11px] text-gray-500 hover:text-gray-300 px-2 py-1 rounded-lg hover:bg-gray-800/60">Edit</button>
-                <button onClick={() => del(item.id)} className="text-[11px] text-red-500/60 hover:text-red-400 px-2 py-1 rounded-lg hover:bg-red-500/10">Del</button>
+                <button onClick={() => openEdit(item)} className="text-xs text-gray-400 hover:text-gray-200 px-2 py-1 rounded-lg hover:bg-gray-700/50 transition-colors">Edit</button>
+                <button onClick={() => del(item.id)} className="text-xs text-gray-500 hover:text-red-400 px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors">Del</button>
               </div>
             </div>
           )}
@@ -344,8 +344,8 @@ function EduFormUI({ form, setF, saving, onSave, onCancel }: { form: EduForm; se
         <div><label className={labelCls}>End Date</label><input value={form.end_date} onChange={e => setF("end_date", e.target.value)} className={inputCls} placeholder="May 2023" /></div>
       </div>
       <div className="flex gap-2 pt-1">
-        <button onClick={onSave} disabled={saving || !form.institution || !form.degree} className="flex-1 text-xs font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 py-2 rounded-lg disabled:opacity-50">{saving ? "Saving..." : "Save"}</button>
-        <button onClick={onCancel} className="text-xs text-gray-500 hover:text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-800/60">Cancel</button>
+        <button onClick={onSave} disabled={saving || !form.institution || !form.degree} className="flex-1 text-xs font-medium text-gray-200 bg-gray-700/40 hover:bg-gray-700/60 border border-gray-600/50 py-2 rounded-lg disabled:opacity-50 transition-colors">{saving ? "Saving..." : "Save"}</button>
+        <button onClick={onCancel} className="text-xs text-gray-400 hover:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-700/40 transition-colors">Cancel</button>
       </div>
     </div>
   );
@@ -362,12 +362,12 @@ export default function ResumePoolTab({ onFlash, onError }: Props) {
   ];
   return (
     <div className="space-y-3">
-      <p className="text-[11px] text-gray-500 leading-relaxed">
+      <p className="text-xs text-gray-400 leading-relaxed">
         Build your resume pool here. The pipeline uses your pool skills for job relevance scoring, then selects the top matching experiences and projects for each JD before AI tailoring.
       </p>
       <div className="flex gap-1 flex-wrap">
         {sections.map(s => (
-          <button key={s.id} onClick={() => setSection(s.id)} className={`px-3 py-1.5 text-[11px] font-medium rounded-lg transition-all border ${section === s.id ? s.activeColor : "text-gray-600 border-transparent hover:text-gray-400"}`}>{s.label}</button>
+          <button key={s.id} onClick={() => setSection(s.id)} className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all border ${section === s.id ? s.activeColor : "text-gray-500 border-transparent hover:text-gray-300"}`}>{s.label}</button>
         ))}
       </div>
       {section === "profile" && <ProfileSection onFlash={onFlash} onError={onError} />}

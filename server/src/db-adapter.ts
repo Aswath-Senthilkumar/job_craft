@@ -22,7 +22,7 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   RELEVANCE_SCORE_THRESHOLD: "5",
   TAILORING_INTENSITY: "5",
   BATCH_DELAY_MS: "2000",
-  APIFY_JOB_COUNT: "100",
+  APIFY_JOB_COUNT: "20",
   APIFY_MAX_POLL_MINUTES: "10",
   MAX_JOBS_TEST_LIMIT: "0",
   MAX_AGE_DAYS: "14",
@@ -606,6 +606,52 @@ export async function downloadResume(filename: string, client?: any): Promise<{ 
     buffer: Buffer.from(arrayBuffer),
     contentType: blob.type || "application/pdf",
   };
+}
+
+// ── Adapter: Interview Prep ────────────────────────────────────────────────────
+
+export async function getInterviewPrep(jobId: number, client?: any): Promise<any | null> {
+  const c = resolveClient(client);
+  const { data, error } = await c.database.from("interview_prep")
+    .select()
+    .eq("job_id", jobId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function upsertInterviewPrep(jobId: number, fields: Record<string, any>, client?: any, userId?: string): Promise<any> {
+  const c = resolveClient(client);
+  const now = new Date().toISOString();
+  const record: Record<string, any> = {
+    job_id: jobId,
+    status: fields.status || "pending",
+    updated_at: now,
+    created_at: now,
+  };
+  if (userId) record.user_id = userId;
+
+  // Check existing first (UNIQUE on user_id+job_id)
+  const existing = await getInterviewPrep(jobId, c);
+  if (existing) {
+    return updateInterviewPrep(existing.id, fields, c);
+  }
+
+  const { data, error } = await c.database.from("interview_prep").insert([record]).select();
+  if (error) throw error;
+  return data?.[0];
+}
+
+export async function updateInterviewPrep(id: number, fields: Record<string, any>, client?: any): Promise<any | null> {
+  const c = resolveClient(client);
+  const allowed = ["intel_report_url", "prep_guide_url", "status", "error_message", "web_research", "email_context", "updated_at"];
+  const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+  for (const key of allowed) {
+    if (fields[key] !== undefined) updates[key] = fields[key];
+  }
+  const { data, error } = await c.database.from("interview_prep").update(updates).eq("id", id).select();
+  if (error) throw error;
+  return data?.[0] || null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────

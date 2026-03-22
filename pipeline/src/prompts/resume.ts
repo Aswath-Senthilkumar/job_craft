@@ -95,7 +95,8 @@ Return ONLY valid JSON. No backticks. No markdown. Start with { and end with }.
     "domain": "string",
     "seniority": "string",
     "screened_skills": ["string"],
-    "seniority_signals": ["string"]
+    "seniority_signals": ["string"],
+    "company_url": "string or null — the company website URL if found verbatim in the JD (e.g. https://company.com), otherwise null"
   },
   "resumeData": {
     "personalInfo": {

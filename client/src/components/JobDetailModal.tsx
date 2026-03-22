@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Job, JobStatus, COLUMNS } from "../types";
 import { updateJobNotes, deleteJob, updateJobStatus } from "../api";
+import InterviewPrepModal from "./InterviewPrepModal";
 
 interface Props {
   job: Job;
@@ -16,6 +17,7 @@ export default function JobDetailModal({ job, onClose, onUpdate, onDelete }: Pro
   const [showDesc, setShowDesc] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedDesc, setCopiedDesc] = useState(false);
+  const [showPrepModal, setShowPrepModal] = useState(false);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -86,6 +88,7 @@ export default function JobDetailModal({ job, onClose, onUpdate, onDelete }: Pro
     : null;
 
   return (
+    <>
     <div className="fixed inset-0 bg-black/70 modal-backdrop flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
         className="bg-[#0d0f13] border border-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
@@ -311,6 +314,27 @@ export default function JobDetailModal({ job, onClose, onUpdate, onDelete }: Pro
           </div>
         </div>
 
+        {/* Interview Prep Section — shown when status is interviewing */}
+        {job.status === "interviewing" && (
+          <div className="px-6 py-3 border-b border-gray-800/50 bg-[#0a0c10]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-semibold text-amber-400/80 uppercase tracking-wider">Interview Prep</p>
+                <p className="text-xs text-gray-500 mt-0.5">AI-generated intel report + personalised prep guide</p>
+              </div>
+              <button
+                onClick={() => setShowPrepModal(true)}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                View Prep
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Quick Links */}
         <div className="px-6 py-3 border-b border-gray-800/50 flex flex-wrap gap-2">
           {job.job_link && (
@@ -464,5 +488,15 @@ export default function JobDetailModal({ job, onClose, onUpdate, onDelete }: Pro
         </div>
       </div>
     </div>
+
+    {showPrepModal && (
+      <InterviewPrepModal
+        jobId={job.id}
+        jobTitle={job.job_title}
+        companyName={job.company_name}
+        onClose={() => setShowPrepModal(false)}
+      />
+    )}
+    </>
   );
 }

@@ -11,6 +11,7 @@ import eventsRouter from "./routes/events";
 import settingsRouter from "./routes/settings";
 import resumePoolRouter from "./routes/resume-pool";
 import pipelineRouter from "./routes/pipeline";
+import interviewPrepRouter from "./routes/interview-prep";
 import { authMiddleware } from "./middleware/auth";
 
 const app = express();
@@ -43,6 +44,7 @@ app.use("/api/events", eventsRouter);
 app.use("/api/settings", settingsRouter);
 app.use("/api/resume-pool", resumePoolRouter);
 app.use("/api/pipeline", pipelineRouter);
+app.use("/api/interview-prep", interviewPrepRouter);
 
 const server = app.listen(PORT, () => {
   console.log(`Job Tracker API running on http://localhost:${PORT}`);

@@ -315,9 +315,6 @@ async function main() {
     return;
   }
 
-  // ── Step 4b: Wake up PDF backend before processing starts ──
-  await warmUpPdfBackend();
-
   // ── Phase 2: Process relevant jobs (AI resume tailoring + PDF) ──
   const intensityLabel = config.TAILORING_INTENSITY <= 3 ? "LOW" : config.TAILORING_INTENSITY <= 6 ? "MEDIUM" : "HIGH";
   const processLimit = config.MAX_JOBS_TEST_LIMIT > 0
@@ -361,6 +358,11 @@ async function main() {
 
         // Add display order from config
         resumeData.order = config.RESUME_ORDER;
+
+        // Back-fill company URL from JD if the scraper didn't find one
+        if (!job.companyWebsite && jdAnalysis.company_url) {
+          job.companyWebsite = jdAnalysis.company_url;
+        }
 
         log.success(`Resume customized | Domain: ${jdAnalysis.domain} | Seniority: ${jdAnalysis.seniority}`);
         log.info(`Screened skills: ${jdAnalysis.screened_skills.join(", ")}`);
@@ -417,6 +419,9 @@ async function main() {
       }
 
       // ── Generate PDF ──
+      // Re-warm before each job — Render free tier sleeps after ~30s idle,
+      // and Claude tailoring takes ~40s, so the service is asleep by the time we arrive.
+      await warmUpPdfBackend();
       let pdfBuffer: Buffer;
       try {
         pdfBuffer = await generatePdf(resumeData);

@@ -12,6 +12,7 @@ interface Props {
   onToggleSelect: (id: number) => void;
   onDeleteColumn: (status: JobStatus, count: number) => void;
   onSelectAllInColumn?: (status: JobStatus) => void;
+  onOpenPrep?: (job: Job) => void;
 }
 
 export default function KanbanBoard({
@@ -23,6 +24,7 @@ export default function KanbanBoard({
   onToggleSelect,
   onDeleteColumn,
   onSelectAllInColumn,
+  onOpenPrep,
 }: Props) {
   const [hoveredCol, setHoveredCol] = useState<JobStatus | null>(null);
 
@@ -129,6 +131,7 @@ export default function KanbanBoard({
                         selectionMode={selectionMode}
                         isSelected={selectedIds.has(job.id)}
                         onToggleSelect={onToggleSelect}
+                        onOpenPrep={onOpenPrep}
                       />
                     ))}
                     {provided.placeholder}

@@ -1,4 +1,4 @@
-import { Job, JobStatus, CareerEvent, SkillData, ResumeProfile, ResumeExperience, ResumeProject, ResumeEducation } from "./types";
+import { Job, JobStatus, CareerEvent, SkillData, ResumeProfile, ResumeExperience, ResumeProject, ResumeEducation, InterviewPrep } from "./types";
 
 const API_BASE = "/api/jobs";
 
@@ -495,6 +495,39 @@ export async function getPipelineStatus(): Promise<{ running: boolean }> {
 
 export async function stopPipeline(): Promise<void> {
   await authFetch("/api/pipeline/stop", { method: "POST", headers: authHeadersNoBody() });
+}
+
+// ─── Interview Prep API ───────────────────────────────────────────────
+
+const PREP_BASE = "/api/interview-prep";
+
+export async function fetchInterviewPrep(jobId: number): Promise<InterviewPrep> {
+  const res = await authFetch(`${PREP_BASE}/${jobId}`, { headers: authHeadersNoBody() });
+  if (!res.ok) throw new Error("Failed to fetch interview prep");
+  return res.json();
+}
+
+export async function generatePrep(jobId: number): Promise<{ status: string; prepId: number }> {
+  const res = await authFetch(`${PREP_BASE}/${jobId}/generate`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to start prep generation");
+  return res.json();
+}
+
+export async function regeneratePrep(jobId: number): Promise<{ status: string; prepId: number }> {
+  const res = await authFetch(`${PREP_BASE}/${jobId}/regenerate`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to regenerate prep");
+  return res.json();
+}
+
+export function getPrepViewUrl(filename: string): string {
+  const token = getAuthToken();
+  return `/api/interview-prep/view/${filename}?token=${token}`;
 }
 
 export async function extractPoolSkills(text: string): Promise<string[]> {

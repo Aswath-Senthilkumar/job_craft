@@ -1,6 +1,7 @@
 import { Draggable } from "@hello-pangea/dnd";
 import { Job, Column } from "../types";
 import { getAuthToken } from "../api";
+import InterviewPrepBadge from "./InterviewPrepBadge";
 
 const SOURCE_COLORS: Record<string, string> = {
   linkedin: "text-blue-400 bg-blue-500/10 border-blue-500/20",
@@ -48,6 +49,7 @@ interface Props {
   selectionMode: boolean;
   isSelected: boolean;
   onToggleSelect: (id: number) => void;
+  onOpenPrep?: (job: Job) => void;
 }
 
 function ScoreBadge({ score }: { score: number }) {
@@ -119,7 +121,7 @@ function formatDeadline(deadline: string | null): { label: string; urgent: boole
   return { label: `${daysLeft}d left`, urgent: false };
 }
 
-export default function JobCard({ job, index, column, onClick, selectionMode, isSelected, onToggleSelect }: Props) {
+export default function JobCard({ job, index, column, onClick, selectionMode, isSelected, onToggleSelect, onOpenPrep }: Props) {
   const daysAgo = job.applied_date
     ? Math.floor((Date.now() - new Date(job.applied_date).getTime()) / 86400000)
     : null;
@@ -331,6 +333,12 @@ export default function JobCard({ job, index, column, onClick, selectionMode, is
                   </svg>
                   Resume
                 </a>
+              )}
+              {job.status === "interviewing" && !selectionMode && onOpenPrep && (
+                <InterviewPrepBadge
+                  jobId={job.id}
+                  onClick={() => onOpenPrep(job)}
+                />
               )}
               {job.outreach_email && !selectionMode && (
                 <span

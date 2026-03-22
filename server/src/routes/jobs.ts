@@ -84,6 +84,15 @@ router.patch("/:id", async (req: Request, res: Response) => {
     res.status(400).json({ error: "No valid fields to update" });
     return;
   }
+
+  // Auto-trigger interview prep when a job moves to "interviewing"
+  if (updated.status === "interviewing" && existing.status !== "interviewing") {
+    const { triggerPrepIfNew } = require("../services/prep-generator");
+    triggerPrepIfNew(req.params.id, req.insforgeClient).catch((err: any) => {
+      console.error(`[jobs PATCH] Prep trigger failed: ${err.message}`);
+    });
+  }
+
   res.json(updated);
 });
 

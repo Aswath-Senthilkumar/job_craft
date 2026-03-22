@@ -118,6 +118,19 @@ export interface ResumeProfile {
   portfolio: string;
 }
 
+export interface InterviewPrep {
+  status: "none" | "generating" | "completed" | "failed";
+  prepId?: number;
+  intelReportUrl?: string | null;
+  prepGuideUrl?: string | null;
+  hasMarkdownFallback?: boolean;
+  intelMarkdown?: string | null;
+  prepMarkdown?: string | null;
+  errorMessage?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export const COLUMNS: Column[] = [
   {
     id: "filtered",

@@ -347,7 +347,7 @@ function classifyEmail(subject: string, snippet: string, body: string): EmailInf
     return { status: "offer", label: "Job offer received", company, jobTitle: null, location: null, date: today };
   }
   // ── Interview (tightened: "next step" alone is too broad — require scheduling/action context)
-  if (/\binterview\b|schedule.{0,20}(call|meeting|interview)|calendar invite|video call|phone screen|meet with you|hiring manager|technical assessment|coding (challenge|test)|take.home|online assessment|hackerrank|codility|testgorilla|move.{0,10}forward.{0,20}(with you|to the next)|invited.{0,15}next.{0,5}(step|round|stage)/.test(text)) {
+  if (/\binterview\b|schedule.{0,20}(call|meeting|interview)|calendar invite|video call|phone screen|meet with you|hiring manager|technical assessment|coding (challenge|test)|take.home|online assessment|hackerrank|codility|testgorilla|move.{0,10}forward.{0,20}(with you|to the next)|invited.{0,15}next.{0,5}(step|round|stage)|your availability.{0,30}(schedule|call|meeting|interview)|discuss.{0,15}next steps|selected for the interview|excited to move forward|congratulations on being selected|blocks of time.{0,30}available/.test(text)) {
     return { status: "interviewing", label: "Interview / next step", company, jobTitle: null, location: null, date: today };
   }
   // ── Rejection
@@ -417,6 +417,17 @@ router.post("/sync", async (req: Request, res: Response) => {
       'OR "extend an offer"',
       'OR "welcome to the team"',
       'OR "schedule an interview"',
+      'OR "schedule a call"',
+      'OR "schedule a meeting"',
+      'OR "your availability"',
+      'OR "move forward with your"',
+      'OR "selected for the interview"',
+      'OR "congratulations on being selected"',
+      'OR "excited to move forward"',
+      'OR "discuss next steps"',
+      'OR "discuss the next steps"',
+      'OR "next steps in our process"',
+      'OR "blocks of time"',
       'OR "application has been received"',
       'OR "successfully applied"',
       ")",
@@ -474,6 +485,15 @@ router.post("/sync", async (req: Request, res: Response) => {
           if (info.status === "offer") fields.offer_date = info.date;
 
           await updateJob(matchedJob.id, fields, req.insforgeClient);
+
+          // Auto-trigger interview prep when Gmail sync moves a job to interviewing
+          if (info.status === "interviewing" && matchedJob.status !== "interviewing") {
+            const { triggerPrepIfNew } = require("../services/prep-generator");
+            triggerPrepIfNew(matchedJob.id, req.insforgeClient).catch((err: any) => {
+              console.error(`[Gmail sync] Prep trigger failed: ${err.message}`);
+            });
+          }
+
           matchedJob.status = info.status;
           updates.push({ id: matchedJob.id, company: matchedJob.company_name, newStatus: info.status, label: info.label, subject });
 
