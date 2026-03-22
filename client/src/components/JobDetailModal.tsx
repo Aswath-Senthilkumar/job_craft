@@ -10,6 +10,24 @@ interface Props {
   onDelete: (id: number) => void;
 }
 
+function stripHtml(raw: string): string {
+  const decoded = raw
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ");
+  return decoded
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export default function JobDetailModal({ job, onClose, onUpdate, onDelete }: Props) {
   const [notes, setNotes] = useState(job.notes || "");
   const [saving, setSaving] = useState(false);
@@ -76,7 +94,7 @@ export default function JobDetailModal({ job, onClose, onUpdate, onDelete }: Pro
 
   function handleCopyDesc() {
     if (job.description) {
-      navigator.clipboard.writeText(job.description);
+      navigator.clipboard.writeText(stripHtml(job.description));
       setCopiedDesc(true);
       setTimeout(() => setCopiedDesc(false), 2000);
     }
@@ -418,7 +436,7 @@ export default function JobDetailModal({ job, onClose, onUpdate, onDelete }: Pro
             </div>
             {showDesc && (
               <div className="mt-3 p-4 bg-[#0a0c10] rounded-xl text-sm text-gray-300 max-h-64 overflow-y-auto leading-relaxed whitespace-pre-wrap border border-gray-800/30">
-                {job.description}
+                {stripHtml(job.description)}
               </div>
             )}
           </div>
