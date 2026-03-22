@@ -180,13 +180,10 @@ router.get("/callback", async (req: Request, res: Response) => {
       <div style='text-align:center'>
         <h2 style='color:#34d399'>Gmail connected!</h2>
         <p>Connected as ${gmailEmail || "your account"}</p>
-        <p style='color:#6b7280'>Redirecting back...</p>
+        <p style='color:#6b7280'>You can close this window.</p>
         <script>
           try { if (window.opener) window.opener.postMessage('gmail_connected', '${clientUrl}'); } catch(e) {}
-          setTimeout(() => {
-            try { window.location.href = '${clientUrl}/?gmail=connected'; } catch(e) {}
-            setTimeout(() => window.close(), 500);
-          }, 800);
+          setTimeout(() => window.close(), 800);
         </script>
       </div>
     </body></html>`);
@@ -339,20 +336,20 @@ function classifyEmail(subject: string, snippet: string, body: string): EmailInf
   const company = extractCompanyFromSubject(subject);
 
   // ── Applied (check FIRST — confirmation emails often contain vague "next steps" language)
-  if (/thank you for apply|application (was sent|has been sent|submitted|received|is under review)|your application to .+ (has been|was)|we.?ve received your application|successfully applied|easy apply|application has been received|we will review/.test(text)) {
+  if (/thank you for apply|application (was sent|has been sent|submitted|received|is under review)|your application to .+ (has been|was)|we.?ve received your application|successfully applied|easy apply|application has been received|will review your application|thank you for your interest in .{1,60} and for/.test(text)) {
     return { status: "applied", label: "Application confirmed", company, jobTitle: null, location: null, date: today };
   }
   // ── Offer
   if (/offer letter|job offer|formal offer|pleased to offer|we.?d like to offer|extend.{0,10}offer|congratulations.{0,30}offer|welcome.{0,20}(team|aboard)|start date|onboarding details|joining date/.test(text)) {
     return { status: "offer", label: "Job offer received", company, jobTitle: null, location: null, date: today };
   }
-  // ── Interview (tightened: "next step" alone is too broad — require scheduling/action context)
-  if (/\binterview\b|schedule.{0,20}(call|meeting|interview)|calendar invite|video call|phone screen|meet with you|hiring manager|technical assessment|coding (challenge|test)|take.home|online assessment|hackerrank|codility|testgorilla|move.{0,10}forward.{0,20}(with you|to the next)|invited.{0,15}next.{0,5}(step|round|stage)|your availability.{0,30}(schedule|call|meeting|interview)|discuss.{0,15}next steps|selected for the interview|excited to move forward|congratulations on being selected|blocks of time.{0,30}available/.test(text)) {
-    return { status: "interviewing", label: "Interview / next step", company, jobTitle: null, location: null, date: today };
-  }
-  // ── Rejection
+  // ── Rejection (check BEFORE interview — rejections often contain "move forward", "next steps" in negative context)
   if (/unfortunately|not moving forward|not selected|other candidates|regret to inform|decided not to (proceed|move)|position.{0,20}filled|wish you.{0,30}(best|luck|success)|after.{0,40}(consideration|review).{0,20}not|not be pursuing|unsuccessful/.test(text)) {
     return { status: "rejected", label: "Application rejected", company, jobTitle: null, location: null, date: today };
+  }
+  // ── Interview
+  if (/\binterview\b|schedule.{0,20}(call|meeting|interview)|calendar invite|video call|phone screen|meet with you|hiring manager|technical assessment|coding (challenge|test)|take.home|online assessment|hackerrank|codility|testgorilla|move.{0,10}forward.{0,20}(with you|to the next)|invited.{0,15}next.{0,5}(step|round|stage)|your availability.{0,30}(schedule|call|meeting|interview)|discuss.{0,15}next steps|selected for the interview|excited to move forward|congratulations on being selected|blocks of time.{0,30}available/.test(text)) {
+    return { status: "interviewing", label: "Interview / next step", company, jobTitle: null, location: null, date: today };
   }
 
   return { status: null, label: "", company, jobTitle: null, location: null, date: today };
@@ -497,35 +494,6 @@ router.post("/sync", async (req: Request, res: Response) => {
           matchedJob.status = info.status;
           updates.push({ id: matchedJob.id, company: matchedJob.company_name, newStatus: info.status, label: info.label, subject });
 
-        } else if (info.status === "applied" && info.company) {
-          const alreadyCreated = allJobs.some((j) => textMatchesCompany(info.company!, j.company_name));
-          if (alreadyCreated) continue;
-
-          const parsed = parseLinkedInApplicationBody(body || snippet, info.company);
-          const jobTitle = parsed.jobTitle || "Application";
-          const location = parsed.location || null;
-
-          let appliedDate = info.date;
-          if (dateHdr) {
-            try {
-              const d = new Date(dateHdr);
-              if (!isNaN(d.getTime())) appliedDate = d.toISOString().split("T")[0];
-            } catch { }
-          }
-
-          const { job: newJob } = await upsertJob({
-            job_title: jobTitle,
-            company_name: info.company,
-            location,
-            status: "applied",
-            applied_date: appliedDate,
-            notes: "Auto-added by Gmail sync"
-          }, req.insforgeClient, req.userId);
-
-          if (newJob) {
-            allJobs.push(newJob);
-            updates.push({ id: newJob.id, company: info.company, newStatus: "applied", label: "New job auto-created", subject, created: true });
-          }
         }
       } catch (msgErr: any) {
         console.error(`[Gmail sync] Error processing message ${msg.id}: ${msgErr.message}`);
