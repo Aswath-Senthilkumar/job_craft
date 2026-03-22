@@ -48,7 +48,7 @@ export default function KanbanBoard({
           return (
             <div
               key={col.id}
-              className="flex flex-col flex-1 min-w-[220px] h-full"
+              className="flex flex-col flex-1 min-w-[190px] lg:min-w-[220px] h-full"
               onMouseEnter={() => setHoveredCol(col.id)}
               onMouseLeave={() => setHoveredCol(null)}
             >

@@ -62,10 +62,10 @@ function ScoreBadge({ score }: { score: number }) {
 
   return (
     <div
-      className={`text-sm font-bold px-2.5 py-1 rounded border ${color} tabular-nums shrink-0`}
+      className={`text-xs lg:text-sm font-bold px-2 lg:px-2.5 py-0.5 lg:py-1 rounded border ${color} tabular-nums shrink-0`}
       title={`Skill Match Score: ${score}/10`}
     >
-      {score}<span className="opacity-50 font-normal text-[10px]">/10</span>
+      {score}<span className="opacity-50 font-normal text-[9px] lg:text-[10px]">/10</span>
     </div>
   );
 }
@@ -156,7 +156,7 @@ export default function JobCard({ job, index, column, onClick, selectionMode, is
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           onClick={handleClick}
-          className={`group relative p-4 rounded-xl border transition-all duration-200 cursor-pointer card-enter
+          className={`group relative p-3 lg:p-4 rounded-xl border transition-all duration-200 cursor-pointer card-enter
             ${snapshot.isDragging
               ? "bg-gray-800 border-blue-500/50 shadow-xl shadow-blue-500/10 scale-[1.03] rotate-[1.5deg] z-50"
               : isSelected
@@ -168,7 +168,7 @@ export default function JobCard({ job, index, column, onClick, selectionMode, is
         >
           {/* Selection checkbox overlay */}
           {selectionMode && (
-            <div className={`absolute top-2.5 right-2.5 w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
+            <div className={`absolute top-2 right-2 lg:top-2.5 lg:right-2.5 w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
               isSelected ? "bg-blue-500 border-blue-500" : "border-gray-600 bg-transparent"
             }`}>
               {isSelected && (
@@ -180,15 +180,15 @@ export default function JobCard({ job, index, column, onClick, selectionMode, is
           )}
 
           {/* Top row: Company avatar + title + score */}
-          <div className="flex items-start gap-2.5">
-            <div className={`w-11 h-11 rounded-lg bg-gradient-to-br ${hashColor(job.company_name)} flex items-center justify-center text-sm font-bold text-white shrink-0 mt-0.5`}>
+          <div className="flex items-start gap-2 lg:gap-2.5">
+            <div className={`w-9 h-9 lg:w-11 lg:h-11 rounded-lg bg-gradient-to-br ${hashColor(job.company_name)} flex items-center justify-center text-xs lg:text-sm font-bold text-white shrink-0 mt-0.5`}>
               {getInitials(job.company_name)}
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-bold text-base text-gray-100 leading-snug truncate">
+              <h3 className="font-bold text-sm lg:text-base text-gray-100 leading-snug truncate">
                 {job.job_title}
               </h3>
-              <p className="text-sm text-gray-400 truncate mt-0.5">{job.company_name}</p>
+              <p className="text-xs lg:text-sm text-gray-400 truncate mt-0.5">{job.company_name}</p>
             </div>
             {!selectionMode && job.match_score != null && <ScoreBadge score={job.match_score} />}
           </div>
@@ -206,9 +206,9 @@ export default function JobCard({ job, index, column, onClick, selectionMode, is
           )}
 
           {/* Tags row */}
-          <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+          <div className="flex flex-wrap items-center gap-1 lg:gap-1.5 mt-2">
             {job.location && (
-              <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-800/60 px-2.5 py-1 rounded-full">
+              <span className="inline-flex items-center gap-1 text-[10px] lg:text-xs text-gray-500 bg-gray-800/60 px-2 lg:px-2.5 py-0.5 lg:py-1 rounded-full">
                 <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -217,12 +217,12 @@ export default function JobCard({ job, index, column, onClick, selectionMode, is
               </span>
             )}
             {job.salary && (
-              <span className="inline-flex items-center text-xs text-emerald-400/80 bg-emerald-500/8 px-2.5 py-1 rounded-full">
+              <span className="inline-flex items-center text-[10px] lg:text-xs text-emerald-400/80 bg-emerald-500/8 px-2 lg:px-2.5 py-0.5 lg:py-1 rounded-full">
                 {job.salary}
               </span>
             )}
             {job.seniority_level && (
-              <span className="inline-flex items-center text-xs text-purple-400/80 bg-purple-500/8 px-2.5 py-1 rounded-full">
+              <span className="inline-flex items-center text-[10px] lg:text-xs text-purple-400/80 bg-purple-500/8 px-2 lg:px-2.5 py-0.5 lg:py-1 rounded-full">
                 {job.seniority_level}
               </span>
             )}
@@ -294,66 +294,67 @@ export default function JobCard({ job, index, column, onClick, selectionMode, is
           )}
 
           {/* Deadline row */}
-          <div className="flex items-center gap-1 mt-2">
+          <div className="flex items-center gap-1 mt-1.5 lg:mt-2">
             <svg className="w-2.5 h-2.5 text-gray-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            <span className={`text-sm ${deadline.urgent ? "text-amber-400 font-medium" : "text-gray-600"}`}>
+            <span className={`text-xs lg:text-sm ${deadline.urgent ? "text-amber-400 font-medium" : "text-gray-600"}`}>
               {deadline.label}
             </span>
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-gray-800/50">
-            {daysAgo !== null ? (
-              <span className="text-sm text-gray-600">
-                {daysAgo === 0 ? "Today" : daysAgo === 1 ? "Yesterday" : `${daysAgo}d ago`}
-              </span>
-            ) : (
-              <span />
-            )}
-            <div className="flex items-center gap-1.5">
+          <div className="mt-2 pt-2 border-t border-gray-800/50 flex flex-col gap-1.5">
+            {/* Row 1: date + applicants */}
+            <div className="flex items-center gap-2">
+              {daysAgo !== null && (
+                <span className="text-xs lg:text-sm text-gray-600">
+                  {daysAgo === 0 ? "Today" : daysAgo === 1 ? "Yesterday" : `${daysAgo}d ago`}
+                </span>
+              )}
               {job.applicants_count && (
-                <span className="text-sm text-gray-600 flex items-center gap-0.5">
+                <span className="text-xs text-gray-600 flex items-center gap-0.5">
                   <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                   {job.applicants_count}
                 </span>
               )}
-              {job.resume_url && !selectionMode && (
-                <a
-                  href={getResumeViewUrl(job.resume_url)}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 px-2.5 py-1 rounded-md transition-colors"
-                  title="View tailored resume PDF"
-                >
-                  <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Resume
-                </a>
-              )}
-              {job.status === "interviewing" && !selectionMode && onOpenPrep && (
-                <InterviewPrepBadge
-                  jobId={job.id}
-                  onClick={() => onOpenPrep(job)}
-                />
-              )}
-              {job.outreach_email && !selectionMode && (
-                <span
-                  className="inline-flex items-center gap-1 text-xs font-medium text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-md"
-                  title="Outreach email drafted — click card to view"
-                >
-                  <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  Email
-                </span>
-              )}
             </div>
+            {/* Action badges */}
+            {!selectionMode && (job.resume_url || (job.status === "interviewing" && onOpenPrep) || job.outreach_email) && (
+              <div className="flex items-center gap-1.5">
+                {job.resume_url && (
+                  <a
+                    href={getResumeViewUrl(job.resume_url)}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 text-[10px] lg:text-xs font-medium text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 px-2 lg:px-2.5 py-0.5 lg:py-1 rounded-md transition-colors"
+                    title="View tailored resume PDF"
+                  >
+                    <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Resume
+                  </a>
+                )}
+                {job.status === "interviewing" && onOpenPrep && (
+                  <InterviewPrepBadge jobId={job.id} onClick={() => onOpenPrep(job)} />
+                )}
+                {job.outreach_email && (
+                  <span
+                    className="inline-flex items-center gap-1 text-[10px] lg:text-xs font-medium text-blue-400 bg-blue-500/10 px-2 lg:px-2.5 py-0.5 lg:py-1 rounded-md"
+                    title="Outreach email drafted — click card to view"
+                  >
+                    <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    Email
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
