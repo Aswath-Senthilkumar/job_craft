@@ -47,6 +47,7 @@ npm-debug.log*
 # unwanted markdown
 resume_prompt_iteration.md
 FUTURE_ENHANCEMENTS.md
+CLAUDE.md
 
 # Sample data
 sample-resume-data.json

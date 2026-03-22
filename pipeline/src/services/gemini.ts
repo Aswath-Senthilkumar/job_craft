@@ -1,19 +1,19 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Anthropic from "@anthropic-ai/sdk";
 import { config } from "../config";
 import { ResumeData, EnhancedBulletResult } from "../types";
 import { PoolSelection } from "../types";
 import { RESUME_SYSTEM_PROMPT, buildResumeUserPrompt, buildBulletEnhancementPrompt } from "../prompts/resume";
 import { log } from "../logger";
 
-const MODEL_NAME = "gemini-3.1-flash-lite-preview";
+const MODEL_NAME = "claude-haiku-4-5-20251001";
 
-let genAI: GoogleGenerativeAI | null = null;
+let anthropic: Anthropic | null = null;
 
-function getGenAI(): GoogleGenerativeAI {
-  if (!genAI) {
-    genAI = new GoogleGenerativeAI(config.GEMINI_API_KEY);
+function getClient(): Anthropic {
+  if (!anthropic) {
+    anthropic = new Anthropic({ apiKey: config.ANTHROPIC_API_KEY });
   }
-  return genAI;
+  return anthropic;
 }
 
 function cleanJsonResponse(text: string): string {
@@ -30,24 +30,29 @@ export async function customizeResume(
   resumeKeywords: string[] = [],
   jdKeywords: string[] = []
 ): Promise<ResumeData> {
-  const ai = getGenAI();
-  const model = ai.getGenerativeModel({ model: MODEL_NAME });
+  const client = getClient();
   const maxAttempts = 2;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const prompt = `${RESUME_SYSTEM_PROMPT}\n\n${buildResumeUserPrompt(resumeText, jobDescription, config.TAILORING_INTENSITY, resumeKeywords, jdKeywords)}`;
-
-      const result = await model.generateContent({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.4 },
+      const message = await client.messages.create({
+        model: MODEL_NAME,
+        max_tokens: 8192,
+        temperature: 0.4,
+        system: RESUME_SYSTEM_PROMPT,
+        messages: [
+          {
+            role: "user",
+            content: buildResumeUserPrompt(resumeText, jobDescription, config.TAILORING_INTENSITY, resumeKeywords, jdKeywords),
+          },
+        ],
       });
 
-      const rawText = result.response.text() || "";
+      const rawText = message.content[0].type === "text" ? message.content[0].text : "";
       const cleaned = cleanJsonResponse(rawText);
 
       if (!cleaned) {
-        throw new Error("Gemini returned empty response for resume customization");
+        throw new Error("Claude returned empty response for resume customization");
       }
 
       const parsed = JSON.parse(cleaned);
@@ -81,23 +86,28 @@ export async function enhanceResumeBullets(
   resumeKeywords: string[] = [],
   jdKeywords: string[] = []
 ): Promise<EnhancedBulletResult> {
-  const ai = getGenAI();
-  const model = ai.getGenerativeModel({ model: MODEL_NAME });
+  const client = getClient();
   const maxAttempts = 2;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const prompt = `${RESUME_SYSTEM_PROMPT}\n\n${buildBulletEnhancementPrompt(pool, jobDescription, config.TAILORING_INTENSITY, resumeKeywords, jdKeywords)}`;
-
-      const result = await model.generateContent({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.4 },
+      const message = await client.messages.create({
+        model: MODEL_NAME,
+        max_tokens: 4096,
+        temperature: 0.4,
+        system: RESUME_SYSTEM_PROMPT,
+        messages: [
+          {
+            role: "user",
+            content: buildBulletEnhancementPrompt(pool, jobDescription, config.TAILORING_INTENSITY, resumeKeywords, jdKeywords),
+          },
+        ],
       });
 
-      const rawText = result.response.text() || "";
+      const rawText = message.content[0].type === "text" ? message.content[0].text : "";
       const cleaned = cleanJsonResponse(rawText);
 
-      if (!cleaned) throw new Error("Gemini returned empty response");
+      if (!cleaned) throw new Error("Claude returned empty response");
 
       const parsed = JSON.parse(cleaned);
       if (!parsed?.jd_analysis?.screened_skills) {

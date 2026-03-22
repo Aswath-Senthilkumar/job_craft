@@ -17,7 +17,7 @@ function optional(key: string, fallback: string): string {
 
 // ── Secrets & infra (always from .env) ──────────────────────────────
 const envConfig = {
-  GEMINI_API_KEY: required("GEMINI_API_KEY"),
+  ANTHROPIC_API_KEY: required("ANTHROPIC_API_KEY"),
   APIFY_API_TOKEN: optional("APIFY_API_TOKEN", ""),
   APIFY_ACTOR_ID: optional("APIFY_ACTOR_ID", ""),
   JOB_TRACKER_URL: optional("JOB_TRACKER_URL", "http://localhost:3002"),
