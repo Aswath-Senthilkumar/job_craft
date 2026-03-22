@@ -17,7 +17,7 @@ npm workspaces monorepo with three packages:
 ```
 job_craft/
   client/     React + TypeScript + Vite + Tailwind CSS   (Kanban dashboard UI)
-  server/     Express + TypeScript REST API               (port 3002)
+  server/     Express + TypeScript REST API               (port 3002 locally, Railway-assigned in production)
   pipeline/   Node.js + TypeScript automation engine      (spawned from dashboard)
 ```
 
@@ -240,7 +240,7 @@ GMAIL_ENCRYPTION_KEY=   # 64-char hex key for AES-256-GCM token encryption
 ANTHROPIC_API_KEY=      # Claude API key for interview prep generation
 TINYFISH_API_KEY=       # Tinyfish agent key for company research
 CLIENT_URL=             # Frontend URL (for CORS)
-PORT=                   # Server port (default 3002)
+PORT=                   # Server port (default 3002 locally; set automatically by Railway in production)
 ```
 
 ---
