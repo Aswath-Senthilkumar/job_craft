@@ -436,7 +436,7 @@ export function runPipeline(
   const controller = new AbortController();
   const refreshToken = localStorage.getItem("refresh_token");
 
-  fetch("/api/pipeline/run", {
+  fetch(`${API_SERVER}/api/pipeline/run`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({ refreshToken }),
