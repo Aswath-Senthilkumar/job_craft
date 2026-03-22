@@ -50,7 +50,7 @@ const SOURCE_DISPLAY: Record<string, string> = {
 };
 
 export default function App() {
-  const { user, loading: authLoading, error: authError, needsVerification, login, signup, verifyEmail, resendVerification, logout, clearError } = useAuth();
+  const { user, loading: authLoading, error: authError, needsVerification, login, signup, verifyEmail, resendVerification, forgotPassword, resetPassword, logout, clearError } = useAuth();
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
@@ -383,7 +383,7 @@ export default function App() {
 
   // Not authenticated — show login/signup page
   if (!user) {
-    return <AuthPage onLogin={login} onSignup={signup} onVerify={verifyEmail} onResend={resendVerification} needsVerification={needsVerification} error={authError} clearError={clearError} />;
+    return <AuthPage onLogin={login} onSignup={signup} onVerify={verifyEmail} onResend={resendVerification} onForgotPassword={forgotPassword} onResetPassword={resetPassword} needsVerification={needsVerification} error={authError} clearError={clearError} />;
   }
 
   if (loading) {

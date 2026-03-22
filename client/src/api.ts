@@ -130,6 +130,30 @@ export async function apiGetMe(): Promise<{ user: any }> {
   return res.json();
 }
 
+export async function apiForgotPassword(email: string): Promise<void> {
+  const res = await fetch(`${API_SERVER}/api/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to send reset email" }));
+    throw new Error(err.error || "Failed to send reset email");
+  }
+}
+
+export async function apiResetPassword(email: string, code: string, newPassword: string): Promise<void> {
+  const res = await fetch(`${API_SERVER}/api/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, code, newPassword }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Failed to reset password" }));
+    throw new Error(err.error || "Failed to reset password");
+  }
+}
+
 export async function apiRefreshToken(refreshToken: string): Promise<{ accessToken: string; refreshToken?: string; user: any }> {
   const res = await fetch(`${API_SERVER}/api/auth/refresh`, {
     method: "POST",

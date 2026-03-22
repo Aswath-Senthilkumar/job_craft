@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { apiLogin, apiSignup, apiLogout, apiGetMe, apiRefreshToken, apiVerifyEmail, apiResendVerification, setAuthToken, getAuthToken } from "../api";
+import { apiLogin, apiSignup, apiLogout, apiGetMe, apiRefreshToken, apiVerifyEmail, apiResendVerification, apiForgotPassword, apiResetPassword, setAuthToken, getAuthToken } from "../api";
 
 export interface AuthUser {
   id: string;
@@ -17,6 +17,8 @@ export interface UseAuthReturn {
   signup: (email: string, password: string, name: string) => Promise<void>;
   verifyEmail: (email: string, otp: string) => Promise<void>;
   resendVerification: (email: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<void>;
+  resetPassword: (email: string, code: string, newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
@@ -133,7 +135,27 @@ export function useAuth(): UseAuthReturn {
     }
   }, []);
 
+  const forgotPassword = useCallback(async (email: string) => {
+    setError(null);
+    try {
+      await apiForgotPassword(email);
+    } catch (err: any) {
+      setError(err.message || "Failed to send reset email");
+      throw err;
+    }
+  }, []);
+
+  const resetPassword = useCallback(async (email: string, code: string, newPassword: string) => {
+    setError(null);
+    try {
+      await apiResetPassword(email, code, newPassword);
+    } catch (err: any) {
+      setError(err.message || "Failed to reset password");
+      throw err;
+    }
+  }, []);
+
   const clearError = useCallback(() => setError(null), []);
 
-  return { user, loading, error, needsVerification, login, signup, verifyEmail, resendVerification, logout, clearError };
+  return { user, loading, error, needsVerification, login, signup, verifyEmail, resendVerification, forgotPassword, resetPassword, logout, clearError };
 }
