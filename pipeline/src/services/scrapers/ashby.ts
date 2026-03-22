@@ -32,7 +32,7 @@ export async function scrapeAshby(keywords: string[], companySlugs: string[]): P
           link: item.jobUrl || item.hostedUrl || `https://jobs.ashbyhq.com/${slug}/${item.id}`,
           applyUrl: item.applyUrl || item.hostedUrl || "",
           location,
-          descriptionText: (item.descriptionPlain || item.descriptionHtml || "").replace(/<[^>]+>/g, " ").trim().slice(0, 3000),
+          descriptionText: (item.descriptionPlain || item.descriptionHtml || "").replace(/<[^>]+>/g, " ").trim().slice(0, 15000),
           postedAt: item.publishedAt || item.updatedAt || undefined,
           source: "ashby",
           externalId: item.id || `${slug}-${title}`,

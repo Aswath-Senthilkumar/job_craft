@@ -37,7 +37,7 @@ export async function scrapeCareerJet(keywords: string[], affiliateId?: string):
           link: item.url || "",
           location: item.locations || location || "",
           salary: item.salary || "",
-          descriptionText: (item.description || "").slice(0, 2000),
+          descriptionText: (item.description || "").slice(0, 15000),
           postedAt: item.date || undefined,
           source: "careerjet",
           externalId: item.url,

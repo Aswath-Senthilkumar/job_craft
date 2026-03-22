@@ -26,7 +26,7 @@ export async function scrapeArbeitnow(keywords: string[]): Promise<ScrapedJob[]>
           companyName: item.company_name || "",
           link: item.url || `https://www.arbeitnow.com/jobs/${item.slug}`,
           location,
-          descriptionText: desc.slice(0, 3000),
+          descriptionText: desc.slice(0, 15000),
           postedAt: item.created_at || undefined,
           tags: item.tags || [],
           employmentType: item.job_types?.[0] || "",

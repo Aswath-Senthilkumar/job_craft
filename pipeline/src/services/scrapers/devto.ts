@@ -21,7 +21,7 @@ export async function scrapeDevTo(keywords: string[]): Promise<ScrapedJob[]> {
           title,
           companyName: item.user?.name || item.organization?.name || "Company",
           link: `https://dev.to${item.path || ""}`,
-          descriptionText: body.slice(0, 3000),
+          descriptionText: body.slice(0, 15000),
           postedAt: item.created_at || undefined,
           tags: item.tag_list || [],
           source: "devto",

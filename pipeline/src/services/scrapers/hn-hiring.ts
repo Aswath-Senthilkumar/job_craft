@@ -41,7 +41,7 @@ export async function scrapeHNHiring(keywords: string[]): Promise<ScrapedJob[]> 
         companyName: company,
         link: `https://news.ycombinator.com/item?id=${hit.objectID}`,
         location,
-        descriptionText: text.replace(/<[^>]+>/g, " ").trim().slice(0, 2000),
+        descriptionText: text.replace(/<[^>]+>/g, " ").trim().slice(0, 15000),
         postedAt: hit.created_at || undefined,
         source: "hn_hiring",
         externalId: hit.objectID,

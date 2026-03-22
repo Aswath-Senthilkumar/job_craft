@@ -36,7 +36,7 @@ export async function scrapeWWR(keywords: string[]): Promise<ScrapedJob[]> {
           companyName: (item["dc:company"] || item.company || "").replace(/<[^>]+>/g, "").trim(),
           link,
           location: region,
-          descriptionText: desc.slice(0, 3000),
+          descriptionText: desc.slice(0, 15000),
           postedAt: item.pubDate ? new Date(item.pubDate).toISOString() : undefined,
           source: "weworkremotely",
           externalId: link,

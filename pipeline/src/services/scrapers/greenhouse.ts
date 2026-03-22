@@ -33,7 +33,7 @@ export async function scrapeGreenhouse(keywords: string[], boardTokens: string[]
           link: item.absolute_url || `https://boards.greenhouse.io/${token}/jobs/${item.id}`,
           applyUrl: item.absolute_url || "",
           location,
-          descriptionText: desc.slice(0, 3000),
+          descriptionText: desc.slice(0, 15000),
           postedAt: item.updated_at || item.created_at || undefined,
           source: "greenhouse",
           externalId: String(item.id),

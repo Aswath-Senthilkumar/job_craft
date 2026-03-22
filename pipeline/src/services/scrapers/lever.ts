@@ -32,7 +32,7 @@ export async function scrapeLever(keywords: string[], companySlugs: string[]): P
           link: item.hostedUrl || item.applyUrl || "",
           applyUrl: item.applyUrl || item.hostedUrl || "",
           location,
-          descriptionText: (item.descriptionPlain || item.description || "").replace(/<[^>]+>/g, " ").trim().slice(0, 3000),
+          descriptionText: (item.descriptionPlain || item.description || "").replace(/<[^>]+>/g, " ").trim().slice(0, 15000),
           postedAt: item.createdAt ? new Date(item.createdAt).toISOString() : undefined,
           employmentType: item.categories?.commitment || "",
           source: "lever",

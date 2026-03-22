@@ -26,7 +26,7 @@ export async function scrapeRemotive(keywords: string[]): Promise<ScrapedJob[]> 
           link: item.url || "",
           location,
           salary: item.salary || "",
-          descriptionText: desc.slice(0, 3000),
+          descriptionText: desc.slice(0, 15000),
           postedAt: item.publication_date || undefined,
           tags: item.tags || [],
           source: "remotive",
