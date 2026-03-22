@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { CareerEvent } from "../types";
 import { fetchEvents } from "../api";
 
+const API_SERVER = import.meta.env.VITE_API_URL ?? "";
+
 interface Props {
   onClose: () => void;
 }
@@ -180,7 +182,7 @@ export default function CareerEventsModal({ onClose }: Props) {
             </button>
           )}
           <a
-            href={`/api/events/export.ics?upcoming=${!showAll}${locationFilter ? `&location=${locationFilter}` : ""}${typeFilter ? `&type=${typeFilter}` : ""}`}
+            href={`${API_SERVER}/api/events/export.ics?upcoming=${!showAll}${locationFilter ? `&location=${locationFilter}` : ""}${typeFilter ? `&type=${typeFilter}` : ""}`}
             download="career-events.ics"
             className="text-xs font-medium text-blue-400 bg-blue-500/8 hover:bg-blue-500/15 border border-blue-500/20 px-2.5 py-1.5 rounded-lg transition-colors ml-auto flex items-center gap-1"
           >

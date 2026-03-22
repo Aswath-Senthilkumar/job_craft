@@ -45,7 +45,7 @@ async function tryRefreshToken(): Promise<boolean> {
   }
 }
 
-async function authFetch(url: string, init?: RequestInit): Promise<Response> {
+export async function authFetch(url: string, init?: RequestInit): Promise<Response> {
   const res = await fetch(url.startsWith("/") ? `${API_SERVER}${url}` : url, init);
   if (res.status !== 401) return res;
 
@@ -528,7 +528,7 @@ export async function regeneratePrep(jobId: number): Promise<{ status: string; p
 
 export function getPrepViewUrl(filename: string): string {
   const token = getAuthToken();
-  return `/api/interview-prep/view/${filename}?token=${token}`;
+  return `${API_SERVER}/api/interview-prep/view/${filename}?token=${token}`;
 }
 
 export async function extractPoolSkills(text: string): Promise<string[]> {

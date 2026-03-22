@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Job, JobStatus, COLUMNS } from "../types";
-import { updateJobNotes, deleteJob, updateJobStatus } from "../api";
+import { updateJobNotes, deleteJob, updateJobStatus, authFetch } from "../api";
 import InterviewPrepModal from "./InterviewPrepModal";
 
 interface Props {
@@ -40,7 +40,7 @@ export default function JobDetailModal({ job, onClose, onUpdate, onDelete }: Pro
 
   async function handleDateChange(field: "interview_date" | "offer_date", value: string) {
     try {
-      const res = await fetch(`/api/jobs/${job.id}`, {
+      const res = await authFetch(`/api/jobs/${job.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [field]: value || null }),

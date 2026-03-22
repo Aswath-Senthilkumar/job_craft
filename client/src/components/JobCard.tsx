@@ -1,6 +1,8 @@
 import { Draggable } from "@hello-pangea/dnd";
 import { Job, Column } from "../types";
 import { getAuthToken } from "../api";
+
+const API_SERVER = import.meta.env.VITE_API_URL ?? "";
 import InterviewPrepBadge from "./InterviewPrepBadge";
 
 const SOURCE_COLORS: Record<string, string> = {
@@ -134,7 +136,7 @@ export default function JobCard({ job, index, column, onClick, selectionMode, is
     const decodedUrl = decodeURIComponent(url);
     const filename = decodedUrl.split("/").pop();
     const token = getAuthToken();
-    return `/api/resume-pool/view/${filename}?token=${token}`;
+    return `${API_SERVER}/api/resume-pool/view/${filename}?token=${token}`;
   };
 
   function handleClick(e: React.MouseEvent) {
