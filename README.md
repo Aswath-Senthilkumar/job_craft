@@ -324,6 +324,13 @@ Notify users when background tasks complete, without requiring them to keep the 
 - Push notification when interview prep documents are ready: company name, job title, and a direct link to open the prep modal
 - In-app notification bell with a history of recent events for users who missed the push
 
+### Additional Scrapers: Company Careers Pages and Workday
+
+Expand coverage by scraping sources that currently require either browser automation or ATS-specific integration.
+
+- **Company careers pages** - Many companies host jobs directly on their own site outside any ATS. A headless browser scraper (Playwright or Puppeteer) would navigate to known careers URLs, extract job listings, and feed them into the existing pipeline. Claude's ATS Discovery step could be extended to also return direct careers page URLs for companies that don't use a known ATS.
+- **Workday** - Workday is one of the most widely used enterprise ATS platforms but has no public API. Jobs are served from per-company Workday tenant URLs (`{company}.wd1.myworkdayjobs.com`). A Workday scraper would call the internal `/jobs` JSON endpoint that Workday's own frontend uses, which returns structured job data without requiring login. Claude's ATS Discovery step would be extended to identify companies running on Workday alongside the existing Ashby/Lever/Greenhouse detection.
+
 ### Pipeline Job Queue Cache
 
 Persist the scored-but-unprocessed job queue after each pipeline run. On the next run, serve from the cache instead of re-scraping, until the cache is depleted or jobs go stale. Reduces redundant scraping when running the pipeline frequently with a low job limit.

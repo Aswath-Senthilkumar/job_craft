@@ -1,14 +1,15 @@
 # Future Enhancements
 
-## ReWrite: Interactive Resume Refinement
+## ReWrite: Resume Editor with Diff Tracking and Manual Refinement
 
-Allow users to review and selectively accept/reject AI-suggested bullet point improvements after the pipeline generates a tailored resume.
+After the pipeline generates a tailored resume, users should be able to review AI changes, accept/reject individual bullet improvements, manually rewrite any section, reorder content, and regenerate the PDF — all from the dashboard.
 
 **Flow:**
-1. User opens a job's resume in the dashboard
-2. Server reads stored `resume_data` (original vs improved bullet pairs) from the DB
-3. UI displays side-by-side comparison with per-bullet accept/reject toggles
-4. On "Apply", server swaps accepted bullets into the resume JSON and regenerates the PDF via `PDF_BACKEND_URL`
+1. User clicks a job card's resume badge → opens the Resume Editor modal
+2. UI loads the stored `resume_data` JSON showing original pool bullets vs. AI-enhanced bullets side by side with diff highlighting
+3. Per-bullet accept/reject toggles plus free-text editing on any field (summary, bullets, skills)
+4. Drag-and-drop reordering of bullet points within each experience/project block
+5. "Regenerate PDF" button calls the PDF backend with the edited `resume_data`, uploads the new PDF, and updates `resume_url` on the job
 
 **What's already in place:**
 - `resume_data` column exists in the jobs table (stores full resume JSON with original/improved pairs)
@@ -17,11 +18,13 @@ Allow users to review and selectively accept/reject AI-suggested bullet point im
 - Client API functions `analyzeResume()` and `applySuggestions()` exist in `api.ts`
 
 **What needs to be built:**
-- `server/src/routes/resume-analyze.ts` — two endpoints:
-  - `POST /api/jobs/:id/analyze-resume` — read stored `resume_data` + keyword columns, return analysis
-  - `POST /api/jobs/:id/apply-suggestions` — swap accepted bullets in JSON, call PDF backend, save new PDF
+- Expand `ResumeCompareModal.tsx` to support inline editing and drag-and-drop bullet reordering
+- `server/src/routes/resume-analyze.ts` — endpoints:
+  - `POST /api/jobs/:id/analyze-resume` — read stored `resume_data` + keyword columns, return diff analysis
+  - `POST /api/jobs/:id/apply-suggestions` — persist edited `resume_data`, call PDF backend, save new PDF
 - Register the route in `server/src/index.ts`
 - Add `PDF_BACKEND_URL` to `server/.env.example`
+- Diff computation utility — compare original vs. AI output at the sentence level
 
 ## Networking Outreach
 
@@ -68,33 +71,25 @@ Search for local career fairs, tech meetups, and networking events relevant to t
 EVENTBRITE_API_KEY=   # Eventbrite private token
 ```
 
-## Resume Manual Editor with Diff Tracking
+## Additional Scrapers: Company Careers Pages and Workday
 
-**Problem:** The AI-tailored resume is generated and uploaded as a PDF, but users have no way to review the generated content, make manual edits, restructure bullet points, or adjust layout/alignment before the final PDF is produced.
+### Company Careers Pages
 
-**Proposed solution:** After the pipeline generates a tailored resume, surface an in-dashboard editor that shows the AI output with diff highlighting (original pool content vs. AI-enhanced version). Users can accept/reject individual changes, manually rewrite any section, reorder bullet points via drag-and-drop, and trigger a PDF regeneration from the edited content.
-
-**Flow:**
-1. User clicks a job card's resume badge → opens the Resume Editor modal
-2. UI loads the stored `resume_data` JSON (original pool bullets + AI-enhanced bullets side by side)
-3. Diff view highlights additions, removals, and rewrites per bullet with accept/reject toggles
-4. Free-text editing allowed on any field — summary, bullets, skills, section order
-5. Drag-and-drop reordering of bullet points within each experience/project block
-6. "Regenerate PDF" button calls the PDF backend with the edited `resume_data` and replaces the stored PDF
+Many companies host jobs directly on their own careers site outside any ATS. The existing ATS Discovery step (Claude) could be extended to return direct careers page URLs for companies that don't use a known ATS. A headless browser scraper (Playwright or Puppeteer) would then navigate those URLs, extract job listings from the page DOM, and feed them into the standard pipeline flow.
 
 **What needs to be built:**
-- Resume editor modal (`client/src/components/ResumeEditorModal.tsx`) — diff view, inline editing, drag-and-drop bullets
-- `POST /api/jobs/:id/save-resume` — persist manually edited `resume_data` back to the DB
-- `POST /api/jobs/:id/regenerate-pdf` — call `PDF_BACKEND_URL` with edited data, upload new PDF, update `resume_url`
-- Diff computation utility — compare original pool bullets vs. AI output at the sentence level
-- Layout alignment controls — section spacing, bullet indent, font size hints passed to the PDF renderer
+- Extend ATS Discovery Claude prompt to also return `{ careers: { company: string, url: string }[] }` for non-ATS companies
+- `pipeline/src/services/scrapers/careers-page.ts` — Playwright-based scraper that accepts a list of `{ company, url }` pairs and extracts job listings from each
+- Normalise scraped output into the standard `ScrapedJob` shape and merge into the existing orchestrator flow
 
-**Why deferred:**
-- Requires a rich text / structured editor component with diff rendering — non-trivial UI work
-- PDF renderer would need to accept fine-grained layout hints beyond the current resume JSON schema
-- The `resume_data` column and pipeline attachment are already in place, so the data layer is ready
+### Workday
 
----
+Workday is one of the most widely used enterprise ATS platforms but provides no public API. Jobs are served from per-company Workday tenant subdomains (`{company}.wd1.myworkdayjobs.com`). Workday's own frontend calls an internal `/jobs` JSON endpoint that returns structured job data without requiring login, making it scrapeable.
+
+**What needs to be built:**
+- Extend ATS Discovery Claude prompt to detect companies running on Workday and return their tenant slugs alongside Ashby/Lever/Greenhouse
+- `pipeline/src/services/scrapers/workday.ts` — calls `https://{slug}.wd1.myworkdayjobs.com/wday/cxs/{slug}/{board}/jobs` with a POST body specifying keyword and limit; normalises the response into `ScrapedJob`
+- Add `SCRAPE_WORKDAY` toggle to settings and orchestrator
 
 ## Pipeline Job Queue Cache
 
