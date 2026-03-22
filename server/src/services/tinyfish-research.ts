@@ -48,7 +48,7 @@ IMPORTANT: Return ONLY the JSON object, no markdown wrapping, no explanation.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ url: startUrl, goal }),
-      signal: AbortSignal.timeout(480000), // 8 min — TinyFish can take 6-7 min on complex companies
+      signal: AbortSignal.timeout(600000), // 10 min — TinyFish can take 6-7 min on complex companies
     });
 
     if (!res.ok) {

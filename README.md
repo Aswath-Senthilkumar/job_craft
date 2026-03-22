@@ -239,6 +239,14 @@ For each job in the tracker, find potential contacts at the company and generate
 
 Search and display local career fairs, tech meetups, and networking events matched to the user's location and job keywords. Infrastructure (DB table, route shell, UI component) is already partially in place.
 
+### Push Notifications
+
+Notify users when background tasks complete, without requiring them to keep the dashboard open.
+
+- Browser push notification when the pipeline finishes: how many jobs were added, score range, and a direct link to the Filtered column
+- Push notification when interview prep documents are ready: company name, job title, and a direct link to open the prep modal
+- In-app notification bell with a history of recent events for users who missed the push
+
 ### Pipeline Job Queue Cache
 
 Persist the scored-but-unprocessed job queue after each pipeline run. On the next run, serve from the cache instead of re-scraping, until the cache is depleted or jobs go stale. Reduces redundant scraping when running the pipeline frequently with a low job limit.

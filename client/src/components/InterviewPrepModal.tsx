@@ -259,21 +259,6 @@ export default function InterviewPrepModal({ jobId, jobTitle, companyName, onClo
                 {pollStuck && (
                   <p className="text-center text-xs text-amber-500/70">Auto-refresh lost connection.</p>
                 )}
-                <div className="text-center">
-                  <button
-                    onClick={async () => {
-                      try {
-                        const updated = await fetchInterviewPrep(jobId);
-                        setPrep(updated);
-                        setPollStuck(false);
-                        pollErrorsRef.current = 0;
-                      } catch { /* ignore */ }
-                    }}
-                    className="text-xs text-gray-600 hover:text-gray-400 underline underline-offset-2 transition-colors"
-                  >
-                    Check status now
-                  </button>
-                </div>
               </div>
             );
           })()}
