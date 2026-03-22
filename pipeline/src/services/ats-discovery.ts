@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Anthropic from "@anthropic-ai/sdk";
 import { config } from "../config";
 import { log } from "../logger";
 import { politeGet } from "./scrapers/utils";
@@ -9,20 +9,18 @@ export interface ATSSlugs {
   greenhouse: string[];
 }
 
-let genAI: GoogleGenerativeAI | null = null;
-function getGenAI(): GoogleGenerativeAI {
-  if (!genAI) genAI = new GoogleGenerativeAI(config.GEMINI_API_KEY);
-  return genAI;
+let anthropic: Anthropic | null = null;
+function getClient(): Anthropic {
+  if (!anthropic) anthropic = new Anthropic({ apiKey: config.ANTHROPIC_API_KEY });
+  return anthropic;
 }
 
 /**
- * Ask Gemini to discover company slugs for ATS platforms
+ * Ask Claude to discover company slugs for ATS platforms
  * based on the user's target roles and countries.
  */
-async function askGeminiForSlugs(): Promise<ATSSlugs> {
-  const ai = getGenAI();
-  const model = ai.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
-
+async function askClaudeForSlugs(): Promise<ATSSlugs> {
+  const client = getClient();
   const roles = config.SEARCH_KEYWORDS;
   const countries = config.TARGET_COUNTRIES;
 
@@ -44,12 +42,14 @@ Return ONLY valid JSON. No backticks, no markdown, no explanation:
 Aim for 15-25 companies per platform. Only include slugs you are confident are correct.`;
 
   try {
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.3 },
+    const message = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1024,
+      temperature: 0.3,
+      messages: [{ role: "user", content: prompt }],
     });
 
-    const rawText = result.response.text() || "";
+    const rawText = message.content[0].type === "text" ? message.content[0].text : "";
     const cleaned = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     const parsed = JSON.parse(cleaned);
 
@@ -59,7 +59,7 @@ Aim for 15-25 companies per platform. Only include slugs you are confident are c
       greenhouse: Array.isArray(parsed.greenhouse) ? parsed.greenhouse.filter((s: any) => typeof s === "string") : [],
     };
   } catch (err: any) {
-    log.warn(`ATS discovery via Gemini failed: ${err.message}`);
+    log.warn(`ATS discovery via Claude failed: ${err.message}`);
     return { ashby: [], lever: [], greenhouse: [] };
   }
 }
@@ -110,8 +110,8 @@ async function validateSlugs(slugs: ATSSlugs): Promise<ATSSlugs> {
  * Discover ATS company slugs using Gemini, then validate them.
  */
 export async function discoverATSSlugs(): Promise<ATSSlugs> {
-  log.step("Discovering company ATS boards via Gemini...");
-  const raw = await askGeminiForSlugs();
+  log.step("Discovering company ATS boards via Claude...");
+  const raw = await askClaudeForSlugs();
   const validated = await validateSlugs(raw);
   return validated;
 }
