@@ -85,7 +85,7 @@ router.post("/run", async (req: Request, res: Response) => {
       }
     }
   } catch {
-    sendEvent("error", "Could not read pipeline .env file");
+    // .env not present in production — pipeline reads settings from DB instead
   }
 
   // Spawn pipeline with fresh token + pipeline's env vars
@@ -103,6 +103,7 @@ router.post("/run", async (req: Request, res: Response) => {
       ...pipelineEnv,
       AUTH_TOKEN: freshToken,
       JOB_TRACKER_URL: `http://localhost:${process.env.PORT || 3002}`,
+      NODE_OPTIONS: "--no-deprecation",
     },
     shell: false,
     stdio: ["ignore", "pipe", "pipe"],
