@@ -2,12 +2,13 @@ import path from "path";
 import fs from "fs";
 import { config, loadSettings, setUserLocation, authHeaders, authHeadersNoBody } from "./config";
 import { log } from "./logger";
-import { PipelineStats, Job, QueuedJob, ResumeData, EnhancedBulletResult } from "./types";
+import { PipelineStats, Job, QueuedJob, ResumeData } from "./types";
 import { scrapeJobs } from "./services/apify";
 import { filterByLocation } from "./services/location-filter";
-import { enhanceResumeBullets } from "./services/gemini";
+import { customizeResume } from "./services/claude";
 import { PoolSelection } from "./types";
 import { generatePdf, warmUpPdfBackend } from "./services/pdf-generator";
+import { fixOrphanRisk } from "./services/layout-fixer";
 import {
   checkDuplicate,
   postFilteredJob,
@@ -32,131 +33,6 @@ function detectJobCategory(title: string, description: string): string | null {
   if (/graduate programme|grad programme|graduate program|grad scheme|new grad|graduate\s+recruit|graduate\s+role/.test(text)) return "graduate";
   if (/\bstartup\b|seed.?stage|series\s+[a-z0-9]+|pre.?seed|early.?stage|scale.?up/i.test(text)) return "startup";
   return null;
-}
-
-/**
- * Assemble full ResumeData from pool (structure/metadata) + AI enhancements (bullets/summary/skills).
- * Pool provides: personalInfo, education, dates, titles, companies, locations.
- * AI provides: enhanced bullet points, tailored summary, reordered skills, jd_analysis.
- */
-function assembleResumeFromPool(pool: PoolSelection, ai: EnhancedBulletResult): ResumeData {
-  const parseDate = (d?: string | null) => {
-    if (!d) return 0;
-    const t = new Date(d).getTime();
-    return isNaN(t) ? 0 : t;
-  };
-
-  // Sort pool items reverse-chronologically
-  const sortedExps = [...pool.experiences].sort((a, b) =>
-    parseDate(b.end_date ?? "9999-12-31") - parseDate(a.end_date ?? "9999-12-31")
-    || parseDate(b.start_date) - parseDate(a.start_date));
-  const sortedProjs = [...pool.projects].sort((a, b) =>
-    parseDate(b.end_date ?? "9999-12-31") - parseDate(a.end_date ?? "9999-12-31")
-    || parseDate(b.start_date) - parseDate(a.start_date));
-
-  // Build a lookup map from AI experience bullets by title+company (lowercased)
-  const aiExpMap = new Map<string, EnhancedBulletResult["experience"][0]>();
-  for (const exp of ai.experience) {
-    aiExpMap.set(`${exp.title.toLowerCase()}|${exp.company.toLowerCase()}`, exp);
-  }
-
-  // Build a lookup map from AI project bullets by name (lowercased)
-  const aiProjMap = new Map<string, EnhancedBulletResult["projects"][0]>();
-  for (const proj of ai.projects) {
-    aiProjMap.set(proj.name.toLowerCase(), proj);
-  }
-
-  const experience = sortedExps.map(exp => {
-    const date = exp.end_date ? `${exp.start_date} - ${exp.end_date}` : `${exp.start_date} - Present`;
-    const poolBullets = exp.description.split("\n").filter(l => l.trim()).map(l =>
-      l.replace(/^[-•]\s*/, "").trim()
-    );
-
-    // Match AI enhancements to pool bullets
-    const aiExp = aiExpMap.get(`${exp.title.toLowerCase()}|${exp.company.toLowerCase()}`);
-    const bulletPoints = poolBullets.map((original, idx) => {
-      const aiBullet = aiExp?.bullets?.[idx];
-      // Use AI improved text if available, otherwise keep original unchanged
-      return {
-        original,
-        improved: aiBullet?.improved ?? null,
-      };
-    });
-
-    return {
-      title: exp.title,
-      company: exp.company,
-      date,
-      location: exp.location || "",
-      summary: exp.summary || "",
-      bulletPoints,
-    };
-  });
-
-  const projects = sortedProjs.map(proj => {
-    const date = proj.start_date
-      ? (proj.end_date ? `${proj.start_date} - ${proj.end_date}` : `${proj.start_date} - Present`)
-      : "";
-    const poolBullets = proj.description.split("\n").filter(l => l.trim()).map(l =>
-      l.replace(/^[-•]\s*/, "").trim()
-    );
-
-    const aiProj = aiProjMap.get(proj.name.toLowerCase());
-    const bulletPoints = poolBullets.map((original, idx) => {
-      const aiBullet = aiProj?.bullets?.[idx];
-      return {
-        original,
-        improved: aiBullet?.improved ?? null,
-      };
-    });
-
-    return {
-      title: proj.name,
-      link: proj.url || "",
-      date,
-      summary: proj.summary || "",
-      location: proj.location || "",
-      bulletPoints,
-    };
-  });
-
-  const personalInfo = {
-    name: pool.profile.name || "",
-    phone: pool.profile.phone || "",
-    email: pool.profile.email || "",
-    linkedin: pool.profile.linkedin || "",
-    github: pool.profile.github || "",
-    portfolio: pool.profile.portfolio || "",
-  };
-
-  const education = pool.education.length > 0
-    ? pool.education.map(edu => ({
-        institution: edu.institution,
-        date: [edu.start_date, edu.end_date].filter(Boolean).join(" - "),
-        degree: edu.degree + (edu.field ? ` in ${edu.field}` : ""),
-        gpa: edu.grade || "",
-      }))
-    : [];
-
-  // Use AI-tailored skills if provided, else fall back to pool's categorized skills
-  const skills = ai.skills?.languages
-    ? ai.skills
-    : pool.skills;
-
-  return {
-    jd_analysis: ai.jd_analysis,
-    resumeData: {
-      personalInfo,
-      summary: ai.summary || "",
-      education,
-      skills,
-      order: config.RESUME_ORDER,
-      experience,
-      projects,
-      certifications: [],
-      awards: [],
-    },
-  };
 }
 
 /**
@@ -203,7 +79,7 @@ async function main() {
     errors: 0,
   };
 
-  // ── Step 1: Discover ATS company boards via Gemini ──
+  // ── Step 1: Discover ATS company boards via Claude ──
   const atsSlugs = await discoverATSSlugs();
 
   // ── Step 2: Scrape all free sources in parallel ──
@@ -358,17 +234,15 @@ async function main() {
     }
   }
 
-  // ── Step 4: Load resume input — pool (preferred) or Google Docs (fallback) ──
+  // ── Step 4: Load resume input — pool (preferred) ──
   let poolMode = false;
   let poolResumeSkills: string[] = [];
   let poolUserName = "Candidate";
-  let poolUserEducation = "a relevant academic background";
 
   try {
-    const [poolRes, profileRes, educationRes] = await Promise.all([
+    const [poolRes, profileRes] = await Promise.all([
       fetch(`${config.JOB_TRACKER_URL}/api/resume-pool/keywords`, { headers: authHeadersNoBody() }),
       fetch(`${config.JOB_TRACKER_URL}/api/resume-pool/profile`, { headers: authHeadersNoBody() }),
-      fetch(`${config.JOB_TRACKER_URL}/api/resume-pool/education`, { headers: authHeadersNoBody() }),
     ]);
 
     if (poolRes.ok) {
@@ -384,19 +258,6 @@ async function main() {
       const profile = await profileRes.json() as { name?: string; location?: string };
       if (profile.name) poolUserName = profile.name;
       if (profile.location) setUserLocation(profile.location);
-    }
-
-    if (educationRes.ok) {
-      const eduList = await educationRes.json() as { degree?: string; field?: string; institution?: string }[];
-      if (eduList.length > 0) {
-        const edu = eduList[0];
-        const degreePart = [edu.degree, edu.field].filter(Boolean).join(" in ");
-        if (degreePart && edu.institution) {
-          poolUserEducation = `${degreePart} from ${edu.institution}`;
-        } else if (degreePart) {
-          poolUserEducation = degreePart;
-        }
-      }
     }
 
     if (poolUserName !== "Candidate") {
@@ -476,7 +337,7 @@ async function main() {
     try {
       const matchReason = `Matched ${matched.length} skills: ${matched.slice(0, 5).join(", ")}${matched.length > 5 ? "..." : ""}. Missing: ${missing.slice(0, 3).join(", ")}${missing.length > 3 ? "..." : ""}`;
 
-      // ── Customize resume via Gemini ──
+      // ── Customize resume via Claude ──
       const jobCategory = detectJobCategory(job.title, job.descriptionText || "");
       let resumeData: ResumeData;
       let jdAnalysis;
@@ -490,12 +351,17 @@ async function main() {
         const poolSelection = await selectRes.json() as PoolSelection;
         log.info(`Pool: ${poolSelection.experiences.length} experiences, ${poolSelection.projects.length} projects selected`);
 
-        // AI returns only enhanced bullets + summary + skills
-        const aiResult = await enhanceResumeBullets(poolSelection, job.descriptionText, resumeKeywords, jdKeywords);
-        // Pipeline assembles full ResumeData from pool structure + AI enhancements
-        resumeData = assembleResumeFromPool(poolSelection, aiResult);
+        // Get full resumeData directly from AI
+        const aiResult = await customizeResume(poolSelection, job.descriptionText);
+        resumeData = aiResult.resumeData;
         jdAnalysis = aiResult.jd_analysis;
-        log.success(`Bullets enhanced: ${aiResult.experience.length} experiences, ${aiResult.projects.length} projects`);
+
+        // Fix orphan risk (projects heading stranded at bottom of page 1)
+        resumeData = fixOrphanRisk(resumeData);
+
+        // Add display order from config
+        resumeData.order = config.RESUME_ORDER;
+
         log.success(`Resume customized | Domain: ${jdAnalysis.domain} | Seniority: ${jdAnalysis.seniority}`);
         log.info(`Screened skills: ${jdAnalysis.screened_skills.join(", ")}`);
       } catch (err: any) {
@@ -506,12 +372,12 @@ async function main() {
 
       // ── Compute added & truly missing keywords after tailoring ──
       const tailoredSkillsText = [
-        resumeData.resumeData?.skills?.languages || "",
-        resumeData.resumeData?.skills?.frameworks || "",
-        resumeData.resumeData?.skills?.dataAndMiddleware || "",
-        resumeData.resumeData?.skills?.cloudAndDevops || "",
-        resumeData.resumeData?.skills?.testingAndTools || "",
-        resumeData.resumeData?.summary || "",
+        resumeData.skills?.languages || "",
+        resumeData.skills?.frameworks || "",
+        resumeData.skills?.dataAndMiddleware || "",
+        resumeData.skills?.cloudAndDevops || "",
+        resumeData.skills?.testingAndTools || "",
+        resumeData.summary || "",
       ].join(" ");
       const tailoredSkills = extractSkills(tailoredSkillsText);
       const tailoredSet = new Set(tailoredSkills.skills.map(s => s.toLowerCase()));
@@ -564,7 +430,7 @@ async function main() {
       // ── Upload PDF to InsForge Storage ──
       let resumeUrl = "";
       try {
-        const candidateName = resumeData.resumeData?.personalInfo?.name || "CANDIDATE";
+        const candidateName = resumeData.personalInfo?.name || "CANDIDATE";
         const rawNameParts = candidateName.toUpperCase().replace(/[^A-Z\s]/g, "").trim().split(/\s+/);
         const nameParts = rawNameParts.length > 0 ? rawNameParts : ["CANDIDATE"];
         const roleClean = (job.title.toUpperCase().replace(/[^A-Z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "")) || "ROLE";
@@ -589,14 +455,8 @@ async function main() {
 
       stats.applied++;
 
-      // ── Test limit ──
-      if (config.MAX_JOBS_TEST_LIMIT > 0 && stats.applied >= config.MAX_JOBS_TEST_LIMIT) {
-        log.info(`TEST MODE: reached limit of ${config.MAX_JOBS_TEST_LIMIT} processed job(s). Stopping.`);
-        break;
-      }
-
       // Rate limiting between jobs
-      if (i < relevantQueue.length - 1) {
+      if (i < processLimit - 1) {
         await delay(config.BATCH_DELAY_MS);
       }
     } catch (err: any) {

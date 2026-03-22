@@ -28,6 +28,39 @@ function authHeadersNoBody(): Record<string, string> {
   return headers;
 }
 
+// Auto-refresh token on 401 and retry the request once
+let refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefreshToken(): Promise<boolean> {
+  const refreshToken = localStorage.getItem("refresh_token");
+  if (!refreshToken) return false;
+  try {
+    const result = await apiRefreshToken(refreshToken);
+    setAuthToken(result.accessToken);
+    if (result.refreshToken) localStorage.setItem("refresh_token", result.refreshToken);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function authFetch(url: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(url, init);
+  if (res.status !== 401) return res;
+
+  // Deduplicate concurrent refresh attempts
+  if (!refreshPromise) {
+    refreshPromise = tryRefreshToken().finally(() => { refreshPromise = null; });
+  }
+  const refreshed = await refreshPromise;
+  if (!refreshed) return res;
+
+  // Retry with new token
+  const newInit = { ...init, headers: { ...init?.headers } as Record<string, string> };
+  if (authToken) newInit.headers["Authorization"] = `Bearer ${authToken}`;
+  return fetch(url, newInit);
+}
+
 // ─── Auth API ─────────────────────────────────────────────────────────
 
 export async function apiLogin(email: string, password: string): Promise<{ user: any; accessToken: string; refreshToken?: string }> {
@@ -109,13 +142,13 @@ export async function apiRefreshToken(refreshToken: string): Promise<{ accessTok
 // ─── Jobs API ─────────────────────────────────────────────────────────
 
 export async function fetchJobs(): Promise<Job[]> {
-  const res = await fetch(API_BASE, { headers: authHeadersNoBody() });
+  const res = await authFetch(API_BASE, { headers: authHeadersNoBody() });
   if (!res.ok) throw new Error("Failed to fetch jobs");
   return res.json();
 }
 
 export async function updateJobStatus(id: number, status: JobStatus): Promise<Job> {
-  const res = await fetch(`${API_BASE}/${id}`, {
+  const res = await authFetch(`${API_BASE}/${id}`, {
     method: "PATCH",
     headers: authHeaders(),
     body: JSON.stringify({ status }),
@@ -125,7 +158,7 @@ export async function updateJobStatus(id: number, status: JobStatus): Promise<Jo
 }
 
 export async function updateJobNotes(id: number, notes: string): Promise<Job> {
-  const res = await fetch(`${API_BASE}/${id}`, {
+  const res = await authFetch(`${API_BASE}/${id}`, {
     method: "PATCH",
     headers: authHeaders(),
     body: JSON.stringify({ notes }),
@@ -135,12 +168,12 @@ export async function updateJobNotes(id: number, notes: string): Promise<Job> {
 }
 
 export async function deleteJob(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/${id}`, { method: "DELETE", headers: authHeadersNoBody() });
+  const res = await authFetch(`${API_BASE}/${id}`, { method: "DELETE", headers: authHeadersNoBody() });
   if (!res.ok) throw new Error("Failed to delete job");
 }
 
 export async function batchDeleteJobs(ids: number[]): Promise<{ deleted: number }> {
-  const res = await fetch(`${API_BASE}/batch`, {
+  const res = await authFetch(`${API_BASE}/batch`, {
     method: "DELETE",
     headers: authHeaders(),
     body: JSON.stringify({ ids }),
@@ -150,7 +183,7 @@ export async function batchDeleteJobs(ids: number[]): Promise<{ deleted: number 
 }
 
 export async function createJob(job: Partial<Job>): Promise<Job> {
-  const res = await fetch(API_BASE, {
+  const res = await authFetch(API_BASE, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(job),
@@ -162,24 +195,24 @@ export async function createJob(job: Partial<Job>): Promise<Job> {
 // ─── Gmail API ────────────────────────────────────────────────────────
 
 export async function gmailStatus(): Promise<{ connected: boolean; lastSync: string | null }> {
-  const res = await fetch("/api/gmail/status", { headers: authHeadersNoBody() });
+  const res = await authFetch("/api/gmail/status", { headers: authHeadersNoBody() });
   if (!res.ok) throw new Error("Failed to get Gmail status");
   return res.json();
 }
 
 export async function gmailAuth(): Promise<{ url: string }> {
-  const res = await fetch("/api/gmail/auth", { headers: authHeadersNoBody() });
+  const res = await authFetch("/api/gmail/auth", { headers: authHeadersNoBody() });
   if (!res.ok) throw new Error("Failed to get Gmail auth URL");
   return res.json();
 }
 
 export async function gmailDisconnect(): Promise<void> {
-  const res = await fetch("/api/gmail/disconnect", { method: "POST", headers: authHeaders() });
+  const res = await authFetch("/api/gmail/disconnect", { method: "POST", headers: authHeaders() });
   if (!res.ok) throw new Error("Failed to disconnect Gmail");
 }
 
 export async function gmailSync(): Promise<{ synced: number; updates: any[]; scanned: number }> {
-  const res = await fetch("/api/gmail/sync", { method: "POST", headers: authHeaders() });
+  const res = await authFetch("/api/gmail/sync", { method: "POST", headers: authHeaders() });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Sync failed" }));
     throw new Error(err.error || "Sync failed");
@@ -195,7 +228,7 @@ export async function fetchCurrentSkills(
   const params = new URLSearchParams();
   if (filters?.role) params.set("role", filters.role);
   if (filters?.location) params.set("location", filters.location);
-  const res = await fetch(`/api/skills/current?${params}`, { headers: authHeadersNoBody() });
+  const res = await authFetch(`/api/skills/current?${params}`, { headers: authHeadersNoBody() });
   if (!res.ok) throw new Error("Failed to fetch skills");
   return res.json();
 }
@@ -207,7 +240,7 @@ export interface SkillFilter {
 }
 
 export async function fetchSkillFilters(): Promise<{ roles: SkillFilter[]; locations: SkillFilter[] }> {
-  const res = await fetch("/api/skills/filters", { headers: authHeadersNoBody() });
+  const res = await authFetch("/api/skills/filters", { headers: authHeadersNoBody() });
   if (!res.ok) throw new Error("Failed to fetch skill filters");
   return res.json();
 }
@@ -221,7 +254,7 @@ export async function fetchEvents(
   const params = new URLSearchParams({ upcoming: String(upcomingOnly) });
   if (filters?.location) params.set("location", filters.location);
   if (filters?.type) params.set("type", filters.type);
-  const res = await fetch(`/api/events?${params}`, { headers: authHeadersNoBody() });
+  const res = await authFetch(`/api/events?${params}`, { headers: authHeadersNoBody() });
   if (!res.ok) throw new Error("Failed to fetch events");
   return res.json();
 }
@@ -265,13 +298,13 @@ export interface SettingsData {
 }
 
 export async function fetchSettings(): Promise<SettingsData> {
-  const res = await fetch("/api/settings", { headers: authHeadersNoBody() });
+  const res = await authFetch("/api/settings", { headers: authHeadersNoBody() });
   if (!res.ok) throw new Error("Failed to fetch settings");
   return res.json();
 }
 
 export async function updateSettings(updates: Partial<PipelineConfig>): Promise<void> {
-  const res = await fetch("/api/settings", {
+  const res = await authFetch("/api/settings", {
     method: "PUT",
     headers: authHeaders(),
     body: JSON.stringify(updates),
@@ -285,13 +318,13 @@ export async function updateSettings(updates: Partial<PipelineConfig>): Promise<
 const POOL_BASE = "/api/resume-pool";
 
 export async function fetchPoolProfile(): Promise<ResumeProfile> {
-  const res = await fetch(`${POOL_BASE}/profile`, { headers: authHeadersNoBody() });
+  const res = await authFetch(`${POOL_BASE}/profile`, { headers: authHeadersNoBody() });
   if (!res.ok) throw new Error("Failed to fetch profile");
   return res.json();
 }
 
 export async function updatePoolProfile(profile: ResumeProfile): Promise<void> {
-  const res = await fetch(`${POOL_BASE}/profile`, {
+  const res = await authFetch(`${POOL_BASE}/profile`, {
     method: "PUT",
     headers: authHeaders(),
     body: JSON.stringify(profile),
@@ -300,13 +333,13 @@ export async function updatePoolProfile(profile: ResumeProfile): Promise<void> {
 }
 
 export async function fetchPoolExperiences(): Promise<ResumeExperience[]> {
-  const res = await fetch(`${POOL_BASE}/experiences`, { headers: authHeadersNoBody() });
+  const res = await authFetch(`${POOL_BASE}/experiences`, { headers: authHeadersNoBody() });
   if (!res.ok) throw new Error("Failed to fetch experiences");
   return res.json();
 }
 
 export async function createPoolExperience(data: Omit<ResumeExperience, "id" | "sort_order">): Promise<ResumeExperience> {
-  const res = await fetch(`${POOL_BASE}/experiences`, {
+  const res = await authFetch(`${POOL_BASE}/experiences`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(data),
@@ -316,7 +349,7 @@ export async function createPoolExperience(data: Omit<ResumeExperience, "id" | "
 }
 
 export async function updatePoolExperience(id: number, data: Partial<ResumeExperience>): Promise<ResumeExperience> {
-  const res = await fetch(`${POOL_BASE}/experiences/${id}`, {
+  const res = await authFetch(`${POOL_BASE}/experiences/${id}`, {
     method: "PUT",
     headers: authHeaders(),
     body: JSON.stringify(data),
@@ -326,18 +359,18 @@ export async function updatePoolExperience(id: number, data: Partial<ResumeExper
 }
 
 export async function deletePoolExperience(id: number): Promise<void> {
-  const res = await fetch(`${POOL_BASE}/experiences/${id}`, { method: "DELETE", headers: authHeadersNoBody() });
+  const res = await authFetch(`${POOL_BASE}/experiences/${id}`, { method: "DELETE", headers: authHeadersNoBody() });
   if (!res.ok) throw new Error("Failed to delete experience");
 }
 
 export async function fetchPoolProjects(): Promise<ResumeProject[]> {
-  const res = await fetch(`${POOL_BASE}/projects`, { headers: authHeadersNoBody() });
+  const res = await authFetch(`${POOL_BASE}/projects`, { headers: authHeadersNoBody() });
   if (!res.ok) throw new Error("Failed to fetch projects");
   return res.json();
 }
 
 export async function createPoolProject(data: Omit<ResumeProject, "id" | "sort_order">): Promise<ResumeProject> {
-  const res = await fetch(`${POOL_BASE}/projects`, {
+  const res = await authFetch(`${POOL_BASE}/projects`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(data),
@@ -347,7 +380,7 @@ export async function createPoolProject(data: Omit<ResumeProject, "id" | "sort_o
 }
 
 export async function updatePoolProject(id: number, data: Partial<ResumeProject>): Promise<ResumeProject> {
-  const res = await fetch(`${POOL_BASE}/projects/${id}`, {
+  const res = await authFetch(`${POOL_BASE}/projects/${id}`, {
     method: "PUT",
     headers: authHeaders(),
     body: JSON.stringify(data),
@@ -357,18 +390,18 @@ export async function updatePoolProject(id: number, data: Partial<ResumeProject>
 }
 
 export async function deletePoolProject(id: number): Promise<void> {
-  const res = await fetch(`${POOL_BASE}/projects/${id}`, { method: "DELETE", headers: authHeadersNoBody() });
+  const res = await authFetch(`${POOL_BASE}/projects/${id}`, { method: "DELETE", headers: authHeadersNoBody() });
   if (!res.ok) throw new Error("Failed to delete project");
 }
 
 export async function fetchPoolEducation(): Promise<ResumeEducation[]> {
-  const res = await fetch(`${POOL_BASE}/education`, { headers: authHeadersNoBody() });
+  const res = await authFetch(`${POOL_BASE}/education`, { headers: authHeadersNoBody() });
   if (!res.ok) throw new Error("Failed to fetch education");
   return res.json();
 }
 
 export async function createPoolEducation(data: Omit<ResumeEducation, "id" | "sort_order">): Promise<ResumeEducation> {
-  const res = await fetch(`${POOL_BASE}/education`, {
+  const res = await authFetch(`${POOL_BASE}/education`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(data),
@@ -378,7 +411,7 @@ export async function createPoolEducation(data: Omit<ResumeEducation, "id" | "so
 }
 
 export async function updatePoolEducation(id: number, data: Partial<ResumeEducation>): Promise<ResumeEducation> {
-  const res = await fetch(`${POOL_BASE}/education/${id}`, {
+  const res = await authFetch(`${POOL_BASE}/education/${id}`, {
     method: "PUT",
     headers: authHeaders(),
     body: JSON.stringify(data),
@@ -388,7 +421,7 @@ export async function updatePoolEducation(id: number, data: Partial<ResumeEducat
 }
 
 export async function deletePoolEducation(id: number): Promise<void> {
-  const res = await fetch(`${POOL_BASE}/education/${id}`, { method: "DELETE", headers: authHeadersNoBody() });
+  const res = await authFetch(`${POOL_BASE}/education/${id}`, { method: "DELETE", headers: authHeadersNoBody() });
   if (!res.ok) throw new Error("Failed to delete education");
 }
 
@@ -455,17 +488,17 @@ export function runPipeline(
 }
 
 export async function getPipelineStatus(): Promise<{ running: boolean }> {
-  const res = await fetch("/api/pipeline/status", { headers: authHeadersNoBody() });
+  const res = await authFetch("/api/pipeline/status", { headers: authHeadersNoBody() });
   if (!res.ok) throw new Error("Failed to get pipeline status");
   return res.json();
 }
 
 export async function stopPipeline(): Promise<void> {
-  await fetch("/api/pipeline/stop", { method: "POST", headers: authHeadersNoBody() });
+  await authFetch("/api/pipeline/stop", { method: "POST", headers: authHeadersNoBody() });
 }
 
 export async function extractPoolSkills(text: string): Promise<string[]> {
-  const res = await fetch(`${POOL_BASE}/extract-skills`, {
+  const res = await authFetch(`${POOL_BASE}/extract-skills`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({ text }),

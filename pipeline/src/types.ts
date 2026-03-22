@@ -86,52 +86,49 @@ export interface CategorizedSkills {
 }
 
 export interface ResumeData {
-  jd_analysis: JdAnalysis;
-  resumeData: {
-    personalInfo: {
-      name: string;
-      phone: string;
-      email: string;
-      linkedin: string;
-      github: string;
-      portfolio: string;
-    };
-    summary: string;
-    education: Array<{
-      institution: string;
-      date: string;
-      degree: string;
-      gpa: string;
-    }>;
-    skills: CategorizedSkills;
-    order: string[];
-    experience: Array<{
-      title: string;
-      company: string;
-      date: string;
-      location: string;
-      summary: string;
-      bulletPoints: BulletPoint[];
-    }>;
-    projects: Array<{
-      title: string;
-      link: string;
-      date: string;
-      summary: string;
-      location: string;
-      bulletPoints: BulletPoint[];
-    }>;
-    certifications: Array<{
-      name: string;
-      issuer: string;
-      date: string;
-    }>;
-    awards: Array<{
-      title: string;
-      issuer: string;
-      date: string;
-    }>;
+  personalInfo: {
+    name: string;
+    phone: string;
+    email: string;
+    linkedin: string;
+    github: string;
+    portfolio: string;
   };
+  summary: string;
+  education: Array<{
+    institution: string;
+    date: string;
+    degree: string;
+    gpa: string;
+  }>;
+  skills: CategorizedSkills;
+  order: string[];
+  experience: Array<{
+    title: string;
+    company: string;
+    date: string;
+    location: string;
+    summary: string;
+    bulletPoints: BulletPoint[];
+  }>;
+  projects: Array<{
+    title: string;
+    link: string;
+    date: string;
+    summary: string;
+    location: string;
+    bulletPoints: BulletPoint[];
+  }>;
+  certifications: Array<{
+    name: string;
+    issuer: string;
+    date: string;
+  }>;
+  awards: Array<{
+    title: string;
+    issuer: string;
+    date: string;
+  }>;
 }
 
 /** AI returns only enhanced bullets — pipeline assembles full ResumeData from pool */

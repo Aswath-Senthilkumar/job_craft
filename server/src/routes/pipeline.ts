@@ -71,7 +71,7 @@ router.post("/run", async (req: Request, res: Response) => {
 
   const pipelineDir = path.resolve(__dirname, "..", "..", "..", "pipeline");
 
-  // Load pipeline's own .env so it has GEMINI_API_KEY, PDF_BACKEND_URL, etc.
+  // Load pipeline's own .env so it has ANTHROPIC_API_KEY, PDF_BACKEND_URL, etc.
   const pipelineEnvPath = path.join(pipelineDir, ".env");
   const pipelineEnv: Record<string, string> = {};
   try {

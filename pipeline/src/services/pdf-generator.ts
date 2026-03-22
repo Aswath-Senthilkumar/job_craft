@@ -75,7 +75,7 @@ export async function generatePdf(resumeData: ResumeData): Promise<Buffer> {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 150_000); // 150s — covers cold start
 
-      const sanitized = sanitizeForLatex(resumeData.resumeData);
+      const sanitized = sanitizeForLatex(resumeData);
       const response = await fetch(config.PDF_BACKEND_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

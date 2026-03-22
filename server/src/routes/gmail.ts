@@ -274,6 +274,7 @@ function extractCompanyFromSubject(subject: string): string | null {
     /your application to\s+(.+?)\s+has been/i,
     /application submitted(?:\s+to)?\s+(.+?)(?:\s*[-–|,!]|$)/i,
     /interview.{0,20}(?:from|with|at)\s+(.+?)(?:\s*[-–|,!]|$)/i,
+    /interview.{0,60}[-–]\s*(.+?)(?:\s*[-–|,!]|$)/i,
     /offer.{0,20}(?:from|at)\s+(.+?)(?:\s*[-–|,!]|$)/i,
     /(?:unfortunately|regret).{0,30}(?:from|at|with)\s+(.+?)(?:\s*[-–|,!]|$)/i,
   ];
@@ -337,17 +338,21 @@ function classifyEmail(subject: string, snippet: string, body: string): EmailInf
   const today = new Date().toISOString().split("T")[0];
   const company = extractCompanyFromSubject(subject);
 
+  // ── Applied (check FIRST — confirmation emails often contain vague "next steps" language)
+  if (/thank you for apply|application (was sent|has been sent|submitted|received|is under review)|your application to .+ (has been|was)|we.?ve received your application|successfully applied|easy apply|application has been received|we will review/.test(text)) {
+    return { status: "applied", label: "Application confirmed", company, jobTitle: null, location: null, date: today };
+  }
+  // ── Offer
   if (/offer letter|job offer|formal offer|pleased to offer|we.?d like to offer|extend.{0,10}offer|congratulations.{0,30}offer|welcome.{0,20}(team|aboard)|start date|onboarding details|joining date/.test(text)) {
     return { status: "offer", label: "Job offer received", company, jobTitle: null, location: null, date: today };
   }
-  if (/\binterview\b|schedule.{0,20}(call|meeting|interview)|calendar invite|video call|phone screen|next step|meet with you|hiring manager|technical assessment|coding (challenge|test)|take.home|online assessment|hackerrank|codility|testgorilla/.test(text)) {
+  // ── Interview (tightened: "next step" alone is too broad — require scheduling/action context)
+  if (/\binterview\b|schedule.{0,20}(call|meeting|interview)|calendar invite|video call|phone screen|meet with you|hiring manager|technical assessment|coding (challenge|test)|take.home|online assessment|hackerrank|codility|testgorilla|move.{0,10}forward.{0,20}(with you|to the next)|invited.{0,15}next.{0,5}(step|round|stage)/.test(text)) {
     return { status: "interviewing", label: "Interview / next step", company, jobTitle: null, location: null, date: today };
   }
+  // ── Rejection
   if (/unfortunately|not moving forward|not selected|other candidates|regret to inform|decided not to (proceed|move)|position.{0,20}filled|wish you.{0,30}(best|luck|success)|after.{0,40}(consideration|review).{0,20}not|not be pursuing|unsuccessful/.test(text)) {
     return { status: "rejected", label: "Application rejected", company, jobTitle: null, location: null, date: today };
-  }
-  if (/application (was sent|has been sent|submitted|received|is under review)|your application to .+ (has been|was)|thank you for apply|we.?ve received your application|successfully applied|easy apply/.test(text)) {
-    return { status: "applied", label: "Application confirmed", company, jobTitle: null, location: null, date: today };
   }
 
   return { status: null, label: "", company, jobTitle: null, location: null, date: today };
@@ -381,9 +386,12 @@ router.post("/sync", async (req: Request, res: Response) => {
     const q = [
       `newer_than:${daysBack}d`,
       "(",
+      // Subject-based matches
       'subject:"application was sent"',
       'OR subject:"application submitted"',
       'OR subject:"thank you for applying"',
+      'OR subject:"thank you for your interest"',
+      'OR subject:"thank you for the showing interest"',
       'OR subject:"we received your application"',
       'OR subject:"your application"',
       'OR subject:interview',
@@ -397,6 +405,20 @@ router.post("/sync", async (req: Request, res: Response) => {
       'OR subject:"phone screen"',
       'OR subject:"video interview"',
       'OR subject:"easy apply"',
+      // Body-based matches (catch emails with generic subjects)
+      'OR "not to move forward"',
+      'OR "decided not to proceed"',
+      'OR "other candidates"',
+      'OR "position has been filled"',
+      'OR "regret to inform"',
+      'OR "wish you the best of luck"',
+      'OR "not be pursuing"',
+      'OR "pleased to offer"',
+      'OR "extend an offer"',
+      'OR "welcome to the team"',
+      'OR "schedule an interview"',
+      'OR "application has been received"',
+      'OR "successfully applied"',
       ")",
       "-label:promotions -label:social -category:promotions",
     ].join(" ");
@@ -430,12 +452,12 @@ router.post("/sync", async (req: Request, res: Response) => {
         let matchedJob: any | null = null;
         for (const job of allJobs) {
           let matched = false;
-          if (fromPlatform) {
-            if (info.company) matched = textMatchesCompany(info.company, job.company_name);
-            if (!matched) matched = textMatchesCompany(subject + " " + snippet, job.company_name);
-          } else {
-            matched = textMatchesCompany(from, job.company_name);
-          }
+          // Try matching company from subject extraction
+          if (info.company) matched = textMatchesCompany(info.company, job.company_name);
+          // Try matching subject/snippet text against job company name
+          if (!matched) matched = textMatchesCompany(subject + " " + snippet, job.company_name);
+          // For direct company emails, also match From address
+          if (!matched && !fromPlatform) matched = textMatchesCompany(from, job.company_name);
           if (!matched) continue;
 
           const newRank = rank[info.status] ?? 0;

@@ -107,7 +107,7 @@ async function validateSlugs(slugs: ATSSlugs): Promise<ATSSlugs> {
 }
 
 /**
- * Discover ATS company slugs using Gemini, then validate them.
+ * Discover ATS company slugs using Claude, then validate them.
  */
 export async function discoverATSSlugs(): Promise<ATSSlugs> {
   log.step("Discovering company ATS boards via Claude...");

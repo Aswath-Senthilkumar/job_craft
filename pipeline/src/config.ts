@@ -54,7 +54,7 @@ const dbSettings = {
   MAX_AGE_DAYS: 14,
   JOB_LEVELS: "",
   MAX_REQ_YOE: 0,
-  RESUME_ORDER: ["summary", "experience", "skills", "projects", "education"] as string[],
+  RESUME_ORDER: ["summary", "skills", "experience", "projects", "education"] as string[],
 
   // Scraper toggles (all enabled by default)
   SCRAPE_REMOTEOK: true,

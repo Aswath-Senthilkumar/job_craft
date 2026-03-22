@@ -19,7 +19,7 @@ const REMOTE_EXCLUDED_PATTERNS = /\b(us[- ]only|usa[- ]only|north america only|c
 // Patterns that indicate remote job is open to worldwide
 const REMOTE_INCLUSIVE_PATTERNS = /\b(worldwide|global|anywhere|work from anywhere|open to all|all locations|no location restriction)\b/i;
 
-// Placeholder strings that carry no real location info — keep them (let Gemini decide)
+// Placeholder strings that carry no real location info — keep them (let Claude decide)
 const PLACEHOLDER_PATTERN = /^(n\/a|na|not specified|not available|tbd|tba|location|various|multiple|see job description|multiple locations?)$/i;
 
 // US state abbreviations (2-letter) — e.g. "San Francisco, CA"
