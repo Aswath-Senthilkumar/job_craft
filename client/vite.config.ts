@@ -9,4 +9,7 @@ export default defineConfig({
       "/api": "http://localhost:3002",
     },
   },
+  preview: {
+    allowedHosts: ["job-tracker-client-production.up.railway.app"],
+  },
 });
