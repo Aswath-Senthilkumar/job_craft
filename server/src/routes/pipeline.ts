@@ -89,7 +89,8 @@ router.post("/run", async (req: Request, res: Response) => {
   }
 
   // Spawn pipeline with fresh token + pipeline's env vars
-  const tsxBin = path.join(pipelineDir, "node_modules", ".bin", "tsx");
+  // Use server's own tsx binary (pipeline may not have its own node_modules in production)
+  const tsxBin = path.resolve(__dirname, "..", "..", "node_modules", ".bin", "tsx");
   const child = spawn(tsxBin, ["src/index.ts"], {
     cwd: pipelineDir,
     env: {
