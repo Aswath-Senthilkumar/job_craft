@@ -13,7 +13,7 @@ const router = Router();
 // Must be defined BEFORE /:jobId to avoid capture by the param route
 router.get("/view/:filename", async (req: Request, res: Response) => {
   try {
-    const filename = req.params.filename;
+    const filename = req.params.filename as string;
     const userId = req.userId;
     if (!userId) throw new Error("Unauthorized");
 
