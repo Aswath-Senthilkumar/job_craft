@@ -126,7 +126,7 @@ router.post("/run", async (req: Request, res: Response) => {
 
   child.on("error", (err) => {
     runningPipelines.delete(userId);
-    sendEvent("error", `Failed to start pipeline: ${err.message}`);
+    sendEvent("error", `Failed to start pipeline: ${err.message} | tsxBin: ${tsxBin} | pipelineDir: ${pipelineDir}`);
     sendEvent("done", "Pipeline failed to start");
     res.end();
   });
