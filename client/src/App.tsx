@@ -18,6 +18,37 @@ interface ConfirmDialog {
   onConfirm: () => void;
 }
 
+const US_STATES = new Set([
+  "al","ak","az","ar","ca","co","ct","de","dc","fl","ga","hi","id","il","in",
+  "ia","ks","ky","la","me","md","ma","mi","mn","ms","mo","mt","ne","nv","nh",
+  "nj","nm","ny","nc","nd","oh","ok","or","pa","ri","sc","sd","tn","tx","ut",
+  "vt","va","wa","wv","wi","wy",
+]);
+
+function normalizeCountry(location: string): string {
+  if (!location) return "";
+  const loc = location.trim();
+  if (/remote|hybrid/i.test(loc)) return "Remote / Hybrid";
+  const parts = loc.split(",").map((p) => p.trim());
+  const last = parts[parts.length - 1].toLowerCase();
+  // US state abbreviation (e.g. "New York, NY")
+  if (US_STATES.has(last)) return "United States";
+  // Explicit US strings
+  if (/\b(united states|usa|u\.s\.a?\.?)\b/i.test(loc)) return "United States";
+  // Single 2-letter word that's a US state
+  if (/^[a-z]{2}$/.test(last) && US_STATES.has(last)) return "United States";
+  // Return last part, title-cased, as the country
+  return parts[parts.length - 1].replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+const SOURCE_DISPLAY: Record<string, string> = {
+  linkedin: "LinkedIn", remoteok: "RemoteOK", jobicy: "Jobicy",
+  arbeitnow: "Arbeitnow", remotive: "Remotive", hn_hiring: "HN Hiring",
+  weworkremotely: "WWR", devto: "dev.to", careerjet: "CareerJet",
+  indeed: "Indeed", glassdoor: "Glassdoor", ashby: "Ashby",
+  lever: "Lever", greenhouse: "Greenhouse", simplify: "Simplify", naukri: "Naukri",
+};
+
 export default function App() {
   const { user, loading: authLoading, error: authError, needsVerification, login, signup, verifyEmail, resendVerification, logout, clearError } = useAuth();
 
@@ -114,13 +145,13 @@ export default function App() {
         : [j.source];
       if (!srcs.some((s) => s === sourceFilter)) return false;
     }
-    // Location filter
+    // Location filter — exact country match via normalizeCountry
     if (locationFilter) {
-      const loc = (j.location || "").toLowerCase();
-      if (locationFilter === "remote") {
-        if (!/remote|hybrid/i.test(loc)) return false;
+      const country = normalizeCountry(j.location || "");
+      if (locationFilter === "Remote / Hybrid") {
+        if (country !== "Remote / Hybrid") return false;
       } else {
-        if (!loc.includes(locationFilter.toLowerCase())) return false;
+        if (country !== locationFilter) return false;
       }
     }
     return true;
@@ -307,6 +338,34 @@ export default function App() {
     count: jobs.filter((j) => j.status === col.id).length,
   }));
 
+  // Dynamic location options — derived from actual jobs, sorted by count
+  const availableLocations = (() => {
+    const counts = new Map<string, number>();
+    for (const j of jobs) {
+      const country = normalizeCountry(j.location || "");
+      if (country) counts.set(country, (counts.get(country) ?? 0) + 1);
+    }
+    // Separate Remote / Hybrid, sort rest alphabetically with count
+    const remote = counts.get("Remote / Hybrid") ?? 0;
+    counts.delete("Remote / Hybrid");
+    const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c);
+    return { countries: sorted, hasRemote: remote > 0 };
+  })();
+
+  // Dynamic source options — derived from actual jobs
+  const availableSources = (() => {
+    const seen = new Set<string>();
+    for (const j of jobs) {
+      const srcs: string[] = j.sources
+        ? (() => { try { return JSON.parse(j.sources); } catch { return [j.source]; } })()
+        : (j.source ? [j.source] : []);
+      for (const s of srcs) if (s) seen.add(s);
+    }
+    return [...seen].sort((a, b) =>
+      (SOURCE_DISPLAY[a] || a).localeCompare(SOURCE_DISPLAY[b] || b)
+    );
+  })();
+
   const totalApplied = jobs.filter((j) => ["applied", "interviewing", "offer", "rejected"].includes(j.status)).length;
   const interviewRate = totalApplied > 0 ? Math.round((jobs.filter((j) => ["interviewing", "offer"].includes(j.status)).length / totalApplied) * 100) : 0;
   const offerRate = totalApplied > 0 ? Math.round((jobs.filter((j) => j.status === "offer").length / totalApplied) * 100) : 0;
@@ -424,41 +483,31 @@ export default function App() {
           </button>
         </div>
 
-        {/* Location filter */}
+        {/* Location filter — dynamic from tracker jobs */}
         <select
           value={locationFilter}
           onChange={(e) => setLocationFilter(e.target.value)}
           className={`bg-[#0d1117] border rounded-lg px-2.5 lg:px-3.5 py-1.5 lg:py-2 text-xs lg:text-sm focus:outline-none focus:border-blue-500/40 shrink-0 cursor-pointer transition-colors ${locationFilter ? "border-blue-500/35 text-blue-400" : "border-gray-800/60 text-gray-500 hover:border-gray-700"}`}
         >
           <option value="">All locations</option>
-          <option value="united states">United States</option>
-          <option value="india">India</option>
-          <option value="remote">Remote / Hybrid</option>
+          {availableLocations.countries.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+          {availableLocations.hasRemote && (
+            <option value="Remote / Hybrid">Remote / Hybrid</option>
+          )}
         </select>
 
-        {/* Source filter */}
+        {/* Source filter — dynamic from tracker jobs */}
         <select
           value={sourceFilter}
           onChange={(e) => setSourceFilter(e.target.value)}
           className={`bg-[#0d1117] border rounded-lg px-2.5 lg:px-3.5 py-1.5 lg:py-2 text-xs lg:text-sm focus:outline-none focus:border-blue-500/40 shrink-0 cursor-pointer transition-colors ${sourceFilter ? "border-blue-500/35 text-blue-400" : "border-gray-800/60 text-gray-500 hover:border-gray-700"}`}
         >
           <option value="">All sources</option>
-          <option value="linkedin">LinkedIn</option>
-          <option value="remoteok">RemoteOK</option>
-          <option value="jobicy">Jobicy</option>
-          <option value="arbeitnow">Arbeitnow</option>
-          <option value="remotive">Remotive</option>
-          <option value="hn_hiring">HN Hiring</option>
-          <option value="weworkremotely">WWR</option>
-          <option value="devto">dev.to</option>
-          <option value="careerjet">CareerJet</option>
-          <option value="indeed">Indeed</option>
-          <option value="glassdoor">Glassdoor</option>
-          <option value="ashby">Ashby</option>
-          <option value="lever">Lever</option>
-          <option value="greenhouse">Greenhouse</option>
-          <option value="simplify">Simplify</option>
-          <option value="naukri">Naukri</option>
+          {availableSources.map((s) => (
+            <option key={s} value={s}>{SOURCE_DISPLAY[s] || s}</option>
+          ))}
         </select>
 
         {/* Skills */}
