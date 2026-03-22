@@ -24,7 +24,7 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   BATCH_DELAY_MS: "2000",
   APIFY_JOB_COUNT: "20",
   APIFY_MAX_POLL_MINUTES: "10",
-  MAX_JOBS_TEST_LIMIT: "0",
+  MAX_JOBS_TEST_LIMIT: "1",
   MAX_AGE_DAYS: "14",
   JOB_LEVELS: "",
   MAX_REQ_YOE: "0",
