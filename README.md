@@ -74,42 +74,119 @@ The main dashboard is a drag-and-drop Kanban board with six status columns:
 
 ### Automated Job Pipeline
 
-Triggered from the dashboard (Run Pipeline button) or run manually from the CLI. Streams live logs to a terminal-style modal in the UI.
+Triggered from the dashboard (Run Pipeline button) or run manually from the CLI. Streams live logs to a terminal-style modal in the UI via Server-Sent Events (SSE). The pipeline runs as a child process spawned by the Express server so it does not block any API requests during execution.
 
 **Full pipeline flow:**
 
-1. **ATS Discovery** *(Claude)*: discovers Ashby, Lever, and Greenhouse company board slugs based on search keywords so company-specific ATS boards are scraped automatically.
+#### Step 1 - ATS Discovery (Claude)
 
-2. **Multi-Source Scraping** - 15 scrapers run in parallel:
-   - RemoteOK, Jobicy, We Work Remotely (WWR), Remotive, HN Who's Hiring, Arbeitnow, dev.to Jobs, CareerJet, Glassdoor, Indeed, Simplify, Naukri
-   - Ashby, Lever, Greenhouse (company-specific ATS boards via AI-discovered slugs)
-   - Optional: LinkedIn via Apify
+Before scraping begins, Claude identifies which companies use Ashby, Lever, or Greenhouse as their ATS based on the user's search keywords. The prompt instructs Claude to return a JSON object of `{ ashby: string[], lever: string[], greenhouse: string[] }` company slugs. These slugs are passed directly into the three ATS scrapers so company-specific job boards are scraped automatically without the user having to know or configure any company names manually.
 
-3. **Merge & Deduplicate**: jobs from all sources are merged by content hash to eliminate duplicates.
+#### Step 2 - Multi-Source Scraping (15 scrapers in parallel)
 
-4. **Freshness Filter**: drops jobs older than the configured maximum age (default 14 days).
+All 15 scrapers run concurrently via `Promise.allSettled`. Each scraper is independently togglable from the Settings modal. A failed scraper logs a warning and returns an empty array; it never takes down the rest of the run.
 
-5. **Archive**: all scraped jobs are stored in **InsForge** for historical skills trend analysis.
+**Free public APIs (no auth required):**
 
-6. **Location Filter**: keeps only jobs matching target countries using city/state/country inference (US states, major cities, airport codes, Indian cities) rather than simple keyword matching.
+- **RemoteOK** - Calls the public JSON API at `remoteok.com/api`. Returns all active remote listings as a flat array. Filtered in-scraper by keyword match against title/tags and location relevance before adding to the queue.
 
-7. **DB Dedup** *(InsForge)*: batch checks against the tracker DB (10 concurrent) to skip jobs already in the system.
+- **Jobicy** - Calls `jobicy.com/api/v2/remote-jobs` with `geo` and `tag` query params derived from the user's target countries and search keywords. Returns up to 50 listings per keyword-geo combination.
 
-8. **Seniority Filter**: filters by job level (junior/mid/senior/lead/staff/principal) and years-of-experience cap.
+- **We Work Remotely (WWR)** - Parses three RSS feeds (all remote jobs, programming, data science) using `fast-xml-parser`. No API key needed. Each item's `<description>` contains the full job HTML which is stripped to plain text.
 
-9. **Resume Pool Loading** *(InsForge)*: fetches the user's skills, experiences, and projects.
+- **Remotive** - Calls `remotive.com/api/remote-jobs` filtered by category (software-dev, devops-sysadmin, data, etc.). Returns up to 100 listings per category. Keyword match is applied against job title before adding.
 
-10. **Local Skill Matching**: scores each job against resume skills with no AI calls. Jobs below the relevance threshold are dropped before any Claude usage.
+- **HN Who's Hiring** - Uses the Algolia HN search API to find the latest monthly "Who is Hiring" thread, then searches that thread's comments for the user's keywords. Each matching comment is parsed as a job listing. The entire JD is the raw comment text.
 
-11. **AI Resume Tailoring** *(Claude Haiku)*: for each relevant job, selects the best-fit pool items and calls Claude to enhance bullets, write a targeted summary, and optimise skills at configurable intensity.
+- **Arbeitnow** - Calls the free `arbeitnow.com/api/job-board-api` with `tags[]` (keyword) and `location` params. Covers European and remote tech jobs. Runs for each keyword against each target geo.
 
-12. **PDF Generation**: assembles the tailored resume into a PDF via an external PDF backend.
+- **dev.to** - Calls `dev.to/api/listings?category=jobs` filtered by tag. Returns markdown body listings posted by companies directly on dev.to.
 
-13. **Cloud Upload** *(InsForge Storage)*: PDF is uploaded to InsForge cloud storage.
+- **Simplify** - Fetches the daily-updated `listings.json` from the `SimplifyJobs/New-Grad-Positions` GitHub repository. Covers curated new grad and early-career software engineering roles from hundreds of companies. Filtered by keyword match against title and company name.
 
-14. **Post to Tracker** *(InsForge)*: job is added to the Filtered column with resume attached, match score, and matched/missing/added keywords.
+**HTML scrapers (no API key, uses cheerio):**
 
-15. **Skills Snapshot** *(InsForge)*: saves a skill frequency snapshot after each run for trend tracking.
+- **Glassdoor** - Sends a keyword search request to `glassdoor.com/Job/jobs.htm` sorted by date and parses the returned HTML with `cheerio` to extract job cards. Structured data is embedded as JSON-LD in the page and extracted alongside the HTML.
+
+- **Indeed** - Scrapes `indeed.com` (or the country-specific domain, e.g., `indeed.co.in` for India) with keyword and location params. HTML is parsed with `cheerio`. Domain and default location are derived automatically from the user's primary target country setting.
+
+- **Naukri** - Scrapes `naukri.com` search result pages with `cheerio`. India's largest job board with no public API. The scraper first attempts to extract structured job data embedded as JSON inside the page scripts, then falls back to HTML card parsing if the embedded data is absent.
+
+**Company-specific ATS APIs (public, no auth):**
+
+- **Ashby** - Calls `api.ashbyhq.com/posting-api/job-board/{slug}` for each slug discovered by Claude in Step 1. Returns all open roles at that company with full description, location, and apply URL. The Ashby Job Board API is publicly documented and requires no authentication.
+
+- **Lever** - Calls `api.lever.co/v0/postings/{slug}?mode=json` for each Lever company slug. Returns structured posting objects including plain-text description, categories, and apply URL. The Lever Postings API is public with no rate limiting on GET requests.
+
+- **Greenhouse** - Calls `boards-api.greenhouse.io/v1/boards/{token}/jobs?content=true` for each board token. The `content=true` param includes the full job description HTML in the response. Greenhouse's Job Board API is publicly documented and requires no key.
+
+**Optional (requires external service):**
+
+- **LinkedIn via Apify** - If a LinkedIn search URL and Apify API key are configured in Settings, the pipeline calls an Apify actor to scrape LinkedIn job search results. This is the only scraper that requires a paid external service; all others are free.
+
+#### Step 3 - Merge and Deduplicate
+
+All arrays from Step 2 are flattened into a single list. Each job is fingerprinted by a SHA-256 hash of `title + company` (normalised to lowercase). Duplicate entries from overlapping sources are dropped, keeping the first occurrence.
+
+#### Step 4 - Freshness Filter
+
+Jobs are dropped if their `postedAt` date is older than `MAX_AGE_DAYS` (default 14 days). Jobs with no parseable date are kept to avoid dropping valid listings from sources that do not publish dates.
+
+#### Step 5 - Archive (InsForge)
+
+All jobs that passed Steps 3-4, before any location or relevance filtering, are bulk-upserted into the InsForge archive table. This raw snapshot powers the Skills Trend Analysis feature, which tracks which skills appear most frequently across all scraped jobs over time regardless of whether they matched the user's profile.
+
+#### Step 6 - Location Filter
+
+Each job is evaluated against the user's `TARGET_COUNTRIES` setting using a multi-layer inference engine rather than naive keyword matching:
+
+- US state abbreviations (2-letter), major US cities, US airport codes
+- Indian city and state names
+- Remote geographic restriction detection (rejects jobs that say "US only" or "APAC only" if the user's target does not include that region)
+- Placeholder locations (N/A, TBD, "Anywhere") pass through
+- A job with a real, specific non-target location is dropped immediately without falling back to the description
+
+#### Step 7 - DB Dedup (InsForge)
+
+Each surviving job is checked against the user's tracker database to skip any job already in the system (any status column). Checks run in batches of 10 concurrent requests to avoid overwhelming the DB connection pool.
+
+#### Step 8 - Seniority Filter
+
+Job titles and descriptions are scanned for level signals against the user's `JOB_LEVELS` setting (junior / mid / senior / lead / staff / principal). Additionally, explicit years-of-experience requirements parsed from the description are checked against `MAX_REQ_YOE`: set to `-1` to disable, `0` to target freshers only (drops any job requiring more than 0 YOE), or any positive integer to cap at that many years.
+
+#### Step 9 - Resume Pool Loading (InsForge)
+
+The user's full resume pool is fetched from InsForge: profile, all experiences with bullet points and skills, all projects, education, and the consolidated keyword/skills list. This is the only source of truth for what goes into the tailored resume - the pipeline never fabricates any structural content.
+
+#### Step 10 - Local Skill Matching
+
+Each job's title, tags, and description are scanned for matches against the user's pool skills. No AI is involved. A relevance score (1-10) is computed from the proportion of matched skills weighted by recency and importance signals. Jobs below `RELEVANCE_SCORE_THRESHOLD` are dropped before any Claude call is made, keeping API costs proportional to actual relevance.
+
+#### Step 11 - AI Resume Tailoring (Claude Haiku)
+
+For each job that clears the threshold, the resume pool selection endpoint is called to pick the most relevant experiences and projects for that specific JD. Claude Haiku then receives:
+
+- The selected pool items (experiences, projects, skills, profile)
+- The full job description
+- The configured tailoring intensity (1-10)
+
+Claude returns enhanced bullet points, a targeted professional summary, and an optimised skills list. Dates, titles, companies, and all factual structure always come from the pool - Claude only improves the framing and language. The original and enhanced versions of each bullet are stored side by side in `resume_data` for potential future diff-review.
+
+#### Step 12 - PDF Generation
+
+The tailored resume JSON (pool structure + Claude enhancements) is assembled into a resume layout and sent to an external PDF rendering backend (`PDF_BACKEND_URL`). The section order is configurable per user (summary / experience / skills / projects / education).
+
+#### Step 13 - Cloud Upload (InsForge Storage)
+
+The generated PDF binary is uploaded to InsForge cloud storage under the user's namespace (`{userId}/resume-{company}-{title}.pdf`). The returned public URL is attached to the job record.
+
+#### Step 14 - Post to Tracker (InsForge)
+
+The job is inserted into the user's tracker database with status `"filtered"`, the resume PDF URL, the match score, and the full keyword analysis (matched skills, missing skills, skills added by Claude). It appears immediately in the Filtered column of the Kanban board.
+
+#### Step 15 - Skills Snapshot (InsForge)
+
+After all jobs are posted, a skills frequency snapshot is saved: for each skill, how many scraped jobs in this run mentioned it. This time-series data powers the historical trend chart in the Skills Trend Analysis tab, showing how demand for specific skills changes across pipeline runs.
 
 ### Resume Pool
 
