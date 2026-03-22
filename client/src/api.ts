@@ -65,7 +65,7 @@ async function authFetch(url: string, init?: RequestInit): Promise<Response> {
 // ─── Auth API ─────────────────────────────────────────────────────────
 
 export async function apiLogin(email: string, password: string): Promise<{ user: any; accessToken: string; refreshToken?: string }> {
-  const res = await fetch("/api/auth/login", {
+  const res = await fetch(`${API_SERVER}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -78,7 +78,7 @@ export async function apiLogin(email: string, password: string): Promise<{ user:
 }
 
 export async function apiSignup(email: string, password: string, name: string): Promise<{ user: any; accessToken: string; refreshToken?: string }> {
-  const res = await fetch("/api/auth/signup", {
+  const res = await fetch(`${API_SERVER}/api/auth/signup", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password, name }),
@@ -91,7 +91,7 @@ export async function apiSignup(email: string, password: string, name: string): 
 }
 
 export async function apiVerifyEmail(email: string, otp: string): Promise<{ user: any; accessToken: string; refreshToken?: string }> {
-  const res = await fetch("/api/auth/verify", {
+  const res = await fetch(`${API_SERVER}/api/auth/verify", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, otp }),
@@ -104,7 +104,7 @@ export async function apiVerifyEmail(email: string, otp: string): Promise<{ user
 }
 
 export async function apiResendVerification(email: string): Promise<void> {
-  const res = await fetch("/api/auth/resend-verification", {
+  const res = await fetch(`${API_SERVER}/api/auth/resend-verification", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email }),
@@ -116,14 +116,14 @@ export async function apiResendVerification(email: string): Promise<void> {
 }
 
 export async function apiLogout(): Promise<void> {
-  await fetch("/api/auth/logout", {
+  await fetch(`${API_SERVER}/api/auth/logout", {
     method: "POST",
     headers: authHeaders(),
   }).catch(() => {});
 }
 
 export async function apiGetMe(): Promise<{ user: any }> {
-  const res = await fetch("/api/auth/me", {
+  const res = await fetch(`${API_SERVER}/api/auth/me", {
     headers: authHeadersNoBody(),
   });
   if (!res.ok) throw new Error("Not authenticated");
@@ -131,7 +131,7 @@ export async function apiGetMe(): Promise<{ user: any }> {
 }
 
 export async function apiRefreshToken(refreshToken: string): Promise<{ accessToken: string; refreshToken?: string; user: any }> {
-  const res = await fetch("/api/auth/refresh", {
+  const res = await fetch(`${API_SERVER}/api/auth/refresh", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refreshToken }),
