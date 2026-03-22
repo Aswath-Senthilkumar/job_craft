@@ -222,12 +222,25 @@ export function filterByLocation(jobs: Job[]): Job[] {
     // Step 3: Remote/hybrid signals in location string
     const isRemote = /remote|hybrid|wfh|work from home|remote.?first/i.test(loc);
     if (isRemote) {
+      // If location pins to a specific non-target country (e.g. "Remote, Spain"), drop it
+      // unless the user explicitly wants remote jobs
+      const inferredFromLoc = inferCountries(loc);
+      const pinnedToNonTarget =
+        inferredFromLoc.size > 0 &&
+        !matchesCountry(loc, allowedCountries.filter((c) => c !== "remote"));
+      if (pinnedToNonTarget && !acceptRemote) {
+        droppedCount++;
+        if (droppedCount <= 20) {
+          log.info(`  [dropped] "${job.title}" @ "${job.companyName}" — remote pinned to non-target country: "${rawLocStr}"`);
+        }
+        continue;
+      }
       if (acceptRemote && !isExcludedRemote(combined, allowedCountries)) {
         passed.push(job);
         continue;
       }
-      // Remote + description mentions target country → accept
-      if (matchesCountry(descSnippet, allowedCountries.filter((c) => c !== "remote"))) {
+      // Remote with no country pin + description mentions target country → accept
+      if (!pinnedToNonTarget && matchesCountry(descSnippet, allowedCountries.filter((c) => c !== "remote"))) {
         passed.push(job);
         continue;
       }
@@ -244,11 +257,9 @@ export function filterByLocation(jobs: Job[]): Job[] {
       continue;
     }
 
-    // Step 5: Check description for country match (non-remote jobs with a real location)
-    if (matchesCountry(descSnippet, allowedCountries.filter((c) => c !== "remote"))) {
-      passed.push(job);
-      continue;
-    }
+    // Step 5: Job has a real, specific location that didn't match → DROP
+    // Do NOT fall back to description check for jobs with a clear non-target location.
+    // (A job in Dublin, Ireland won't become a US job because its description says "US team")
 
     // Step 6: No match → DROP
     droppedCount++;
