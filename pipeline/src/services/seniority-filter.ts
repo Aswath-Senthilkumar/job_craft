@@ -150,7 +150,7 @@ export function filterBySeniority(
 ): { accepted: Job[]; rejectedCount: number; levelRejected: number; yoeRejected: number } {
   const acceptedLevels = parseJobLevels(jobLevelsStr);
   const checkLevels = acceptedLevels.size > 0;
-  const checkYOE = maxReqYOE > 0;
+  const checkYOE = maxReqYOE >= 0;
 
   if (!checkLevels && !checkYOE) {
     return { accepted: jobs, rejectedCount: 0, levelRejected: 0, yoeRejected: 0 };

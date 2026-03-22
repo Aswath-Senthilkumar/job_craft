@@ -253,12 +253,12 @@ export default function SettingsModal({ onClose }: Props) {
               <div className="grid grid-cols-3 gap-3">
                 <div className="p-3 rounded-xl border border-gray-700/40 bg-[#0e1014]">
                   <label className="text-xs text-gray-300 font-medium block mb-1">Max Required YOE</label>
-                  <p className="text-xs text-gray-500 mb-1">0 = no filter</p>
+                  <p className="text-xs text-gray-500 mb-1">-1 = no filter, 0 = freshers only</p>
                   <input
                     type="number"
                     value={config.MAX_REQ_YOE}
-                    onChange={(e) => updateConfig("MAX_REQ_YOE", parseInt(e.target.value) || 0)}
-                    min={0} max={20}
+                    onChange={(e) => updateConfig("MAX_REQ_YOE", parseInt(e.target.value))}
+                    min={-1} max={20}
                     className="w-full bg-[#0c0f14] border border-gray-700/50 rounded-lg px-2.5 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500/50 transition-colors"
                   />
                 </div>

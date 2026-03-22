@@ -20,7 +20,7 @@ router.get("/", async (req: Request, res: Response) => {
       LINKEDIN_SEARCH_URL: s.LINKEDIN_SEARCH_URL || "",
       MAX_AGE_DAYS: parseInt(s.MAX_AGE_DAYS || "14", 10),
       JOB_LEVELS: s.JOB_LEVELS || "",
-      MAX_REQ_YOE: parseInt(s.MAX_REQ_YOE || "0", 10),
+      MAX_REQ_YOE: parseInt(s.MAX_REQ_YOE ?? "-1", 10),
       RESUME_ORDER: s.RESUME_ORDER || "summary,experience,skills,projects,education",
       SCRAPE_REMOTEOK: s.SCRAPE_REMOTEOK === "true",
       SCRAPE_JOBICY: s.SCRAPE_JOBICY === "true",

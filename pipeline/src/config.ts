@@ -53,7 +53,7 @@ const dbSettings = {
   MAX_JOBS_TEST_LIMIT: 0,
   MAX_AGE_DAYS: 14,
   JOB_LEVELS: "",
-  MAX_REQ_YOE: 0,
+  MAX_REQ_YOE: -1,
   RESUME_ORDER: ["summary", "skills", "experience", "projects", "education"] as string[],
 
   // Scraper toggles (all enabled by default)
