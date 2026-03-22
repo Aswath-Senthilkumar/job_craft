@@ -1,5 +1,6 @@
 import { Job, JobStatus, CareerEvent, SkillData, ResumeProfile, ResumeExperience, ResumeProject, ResumeEducation, InterviewPrep } from "./types";
 
+const API_SERVER = import.meta.env.VITE_API_URL ?? "";
 const API_BASE = "/api/jobs";
 
 // ─── Auth Token Management ───────────────────────────────────────────
@@ -45,7 +46,7 @@ async function tryRefreshToken(): Promise<boolean> {
 }
 
 async function authFetch(url: string, init?: RequestInit): Promise<Response> {
-  const res = await fetch(url, init);
+  const res = await fetch(url.startsWith("/") ? `${API_SERVER}${url}` : url, init);
   if (res.status !== 401) return res;
 
   // Deduplicate concurrent refresh attempts
@@ -58,7 +59,7 @@ async function authFetch(url: string, init?: RequestInit): Promise<Response> {
   // Retry with new token
   const newInit = { ...init, headers: { ...init?.headers } as Record<string, string> };
   if (authToken) newInit.headers["Authorization"] = `Bearer ${authToken}`;
-  return fetch(url, newInit);
+  return fetch(url.startsWith("/") ? `${API_SERVER}${url}` : url, newInit);
 }
 
 // ─── Auth API ─────────────────────────────────────────────────────────
